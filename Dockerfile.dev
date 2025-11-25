@@ -1,0 +1,21 @@
+# Dev-oriented image: live reload with Nest CLI and Prisma client pre-generated.
+FROM node:20-bullseye
+
+WORKDIR /app
+
+# Install deps first to leverage Docker layer cache.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy Prisma schema and generate client.
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy the rest of the source.
+COPY . .
+
+# Expose Nest default port.
+EXPOSE 3000
+
+# Start in watch mode for development.
+CMD ["npm", "run", "start:dev"]
