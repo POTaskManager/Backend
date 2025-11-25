@@ -18,7 +18,7 @@ import { InvitationResendDto } from './dto/invitation-resend.dto';
 import { InvitationsService } from './invitations.service';
 import { ProjectsService } from './projects.service';
 
-@Controller('api/projects')
+@Controller('projects')
 export class ProjectsController {
   constructor(
     private readonly projectsService: ProjectsService,

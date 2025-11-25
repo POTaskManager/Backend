@@ -1,7 +1,7 @@
 # Postman – scenariusze testowe (dev stack)
 
 ## Ustawienia środowiska
-- `baseUrl`: URL backendu, np. `http://localhost:3000` (lub `http://<host>:3000` na zdalnej maszynie).
+- `baseUrl`: URL backendu z prefiksem `/api`, np. `http://localhost:3000/api` (lub `http://<host>:3000/api` na zdalnej maszynie).
 - `userId`, `projectId`, `boardId`, `sprintId`, `taskId`, `accessToken`: uzupełniaj w trakcie wykonywania scenariusza z odpowiedzi poprzednich kroków.
 
 ## Scenariusze CRUD (Users → Projects → Boards → Sprints → Tasks)
