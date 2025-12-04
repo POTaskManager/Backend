@@ -37,36 +37,40 @@ export class AuthService {
         const response = await this.googleClient.getToken(code);
         const tokens = response.tokens;
 
-        // Dodano 'as any', żeby TypeScript nie marudził na typ Promise/void
         const ticket = await this.googleClient.verifyIdToken({
           idToken: tokens.id_token as string,
           audience: process.env.GOOGLE_CLIENT_ID,
         });
 
-        // Rzutujemy na 'any', żeby ominąć sprawdzanie getPayload
         const payload = (ticket as any).getPayload();
 
         if (!payload || !payload.email) {
           throw new UnauthorizedException('Google nie zwróciło adresu email');
         }
 
-        // ZMIANA: Wymuszamy konwersję na String(), żeby naprawić błąd "Type undefined is not assignable to string"
         email = String(payload.email);
         firstName = payload.given_name ? String(payload.given_name) : 'User';
         lastName = payload.family_name ? String(payload.family_name) : '';
 
       } catch (e) {
-        console.error(e); // Ważne: zobaczysz w konsoli co dokładnie się stało
+        console.error(e);
         throw new UnauthorizedException('Nieudana autoryzacja Google');
       }
     }
 
-    // --- Baza Danych ---
+   
     let user = await this.prisma.users.findUnique({
       where: { user_Email: email },
     });
 
-    if (!user) {
+    if (user) {
+
+      user = await this.prisma.users.update({
+        where: { user_userId: user.user_userId },
+        data: { user_LastLogin: new Date() },
+      });
+    } else {
+     
       const randomPassword = uuidv4();
       const hash = await bcrypt.hash(randomPassword, 10);
 
@@ -77,14 +81,11 @@ export class AuthService {
           user_LastName: lastName,
           user_PasswordHash: hash,
           user_IsActive: true,
+          user_LastLogin: new Date(), 
         },
       });
     }
 
-    await this.prisma.users.update({
-      where: { user_userId: user.user_userId },
-      data: { user_LastLogin: new Date() },
-    });
 
     return this.generateTokens(user);
   }
