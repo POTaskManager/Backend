@@ -1,12 +1,7 @@
-import { IsString, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class CreateSessionDto {
-  @IsUUID()
-  userId!: string;
-
   @IsString()
-  provider!: string;
-
-  @IsString()
-  accessToken!: string;
+  @IsNotEmpty()
+  refreshToken: string;
 }
