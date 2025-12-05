@@ -1,31 +1,38 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateSessionDto } from './dto/create-session.dto';
+import { AuthGuard } from '@nestjs/passport';
 import { ExchangeAuthCodeDto } from './dto/exchange-auth-code.dto';
-import { UserInfoRequestDto } from './dto/userinfo-request.dto';
-import { SessionRecord } from './session.service';
+import { CreateSessionDto } from './dto/create-session.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Zadanie #7 i #8: Endpoint do logowania
   @Post('oauth/exchange')
-  exchange(@Body() dto: ExchangeAuthCodeDto) {
-    return this.authService.exchangeAuthorizationCode(dto);
+  @HttpCode(HttpStatus.OK)
+  async exchange(@Body() dto: ExchangeAuthCodeDto) {
+    return this.authService.loginWithGoogle(dto.code);
   }
 
-  @Post('oauth/userinfo')
-  userInfo(@Body() dto: UserInfoRequestDto) {
-    return this.authService.fetchUserInfo(dto);
-  }
-
+  // Zadanie #10: Endpoint do odświeżania sesji
   @Post('sessions')
-  createSession(@Body() dto: CreateSessionDto): Promise<SessionRecord> {
-    return this.authService.createSession(dto);
+  @HttpCode(HttpStatus.OK)
+  async createSession(@Body() dto: CreateSessionDto) {
+    return this.authService.refreshSession(dto.refreshToken);
   }
 
-  @Get('sessions')
-  listSessions(): SessionRecord[] {
-    return this.authService.listSessions();
+  // Zadanie #9: Pobieranie profilu (zabezpieczone tokenem)
+  @UseGuards(AuthGuard('jwt'))
+  @Post('oauth/userinfo')
+  @HttpCode(HttpStatus.OK)
+  async userInfo(@Req() req) {
+    return req.user;
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout() {
+    return this.authService.logout();
   }
 }
