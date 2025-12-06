@@ -44,7 +44,10 @@ export class ProjectsController {
   }
 
   @Put(':id')
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateProjectDto) {
+  update(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
     return this.projectsService.update(id, dto);
   }
 
@@ -97,7 +100,9 @@ export class ProjectsController {
       throw new BadRequestException('Invalid or expired invitation token');
     }
     if (!invitation.roleId) {
-      throw new BadRequestException('Invitation missing roleId; cannot add member');
+      throw new BadRequestException(
+        'Invitation missing roleId; cannot add member',
+      );
     }
 
     const membership = await this.projectsService.addMember(projectId, {

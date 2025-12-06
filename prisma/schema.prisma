@@ -22,6 +22,7 @@ model Users {
   user_IsActive     Boolean  @default(true)
   user_CreationDate DateTime @default(now())
   user_LastLogin    DateTime?
+  user_HashedRefreshToken String? 
 
   // relations
   ProjectsOwned   Projects[]        @relation("Projects_Owner")

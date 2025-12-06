@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { createHash } from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -53,11 +53,30 @@ export class UsersService {
         user_IsActive: true,
         user_CreationDate: true,
         user_LastLogin: true,
+        user_HashedRefreshToken: true,
+      },
+    });
+  }
+
+  findByEmail(email: string) {
+    return this.prisma.users.findUnique({
+      where: { user_Email: email },
+      select: {
+        user_userId: true,
+        user_FirstName: true,
+        user_PasswordHash: true,
       },
     });
   }
 
   private hashPassword(raw: string) {
     return createHash('sha256').update(raw).digest('hex');
+  }
+
+  updateHashedRefreshToken(userId: string, hashedRefreshToken: string | null) {
+    return this.prisma.users.update({
+      where: { user_userId: userId },
+      data: { user_HashedRefreshToken: hashedRefreshToken },
+    });
   }
 }
