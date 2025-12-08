@@ -21,6 +21,7 @@ import { UsersModule } from './users/users.module';
         GOOGLE_CLIENT_ID: Joi.string().required(),
         GOOGLE_CLIENT_SECRET: Joi.string().required(),
         GOOGLE_CALLBACK_URL: Joi.string().required(),
+        GOOGLE_AUTH_REDIRECT: Joi.string().required(),
       }),
     }),
     PrismaModule,

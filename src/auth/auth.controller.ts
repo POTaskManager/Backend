@@ -8,10 +8,15 @@ import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { RefreshAuthGuard } from './guards/refresh-jwt.guard';
+import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('login')
   @UseGuards(LocalAuthGuard)
@@ -19,13 +24,25 @@ export class AuthController {
     @CurrentUser() user: User,
     @Res({ passthrough: true }) response: Response,
   ) {
-    await this.authService.login(user.id);
+    const result = await this.authService.login(user.id);
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 15 * 60 * 1000,
+    });
+    response.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('signout')
-  signOut(@CurrentUser() user: User) {
+  @Post('logout')
+  signOut(@CurrentUser() user: User, @Res() res: Response) {
     this.authService.signOut(user.id);
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+    return res.send({ ok: true });
   }
 
   @Public()
@@ -36,15 +53,50 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
-  async googleCallback(@CurrentUser() user: Users, @Res() res) {
-    console.log('googleCallback', user);
+  async googleCallback(@CurrentUser() user: Users, @Res() res: Response) {
     const response = await this.authService.login(user.user_userId);
-    res.redirect(`http://localhost:5173?token=${response.accessToken}`);
+    const redirectUri = this.configService.getOrThrow<string>(
+      'GOOGLE_AUTH_REDIRECT',
+    );
+
+    res.cookie('access_token', response.accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', response.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.redirect(`${redirectUri}`);
   }
 
   @UseGuards(RefreshAuthGuard)
   @Post('refresh')
-  refreshToken(@Req() req) {
-    return this.authService.refreshToken(req.user.id);
+  async refreshToken(@Req() req, @Res() res: Response) {
+    const result = await this.authService.refreshToken(req.user.id);
+
+    res.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.send({ ok: true });
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getProfile(@CurrentUser() user: User) {
+    return user;
   }
 }

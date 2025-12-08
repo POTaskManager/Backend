@@ -14,7 +14,7 @@ export class AuthService {
   constructor(
     private userService: UsersService,
     private jwtService: JwtService,
-    private configService: ConfigService
+    private configService: ConfigService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -88,7 +88,7 @@ export class AuthService {
   async validateJwtUser(userId: string) {
     const user = await this.userService.findOne(userId);
     if (!user) throw new UnauthorizedException('User not found!');
-    const currentUser: CurrentUser = { id: user.user_userId};
+    const currentUser: CurrentUser = { id: user.user_userId };
     return currentUser;
   }
 
@@ -102,7 +102,8 @@ export class AuthService {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
     const isPasswordMatch = compare(password, user.user_PasswordHash);
-    if (!isPasswordMatch) throw new UnauthorizedException('Invalid credentials');
+    if (!isPasswordMatch)
+      throw new UnauthorizedException('Invalid credentials');
     return user;
   }
 }

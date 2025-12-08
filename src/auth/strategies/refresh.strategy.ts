@@ -23,13 +23,11 @@ export class RefreshJwtStrategy extends PassportStrategy(
     });
   }
 
-  // authorization: Bearer sldfk;lsdkf'lskald'sdkf;sdl
-
-  validate(req: Request, payload: AuthJwtPayload) {
-    const refreshToken = req.get('authorization')?.replace('Bearer', '').trim();
+  async validate(req: Request, payload: AuthJwtPayload) {
+    const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken)
       throw new UnauthorizedException('Refresh token is required');
     const userId = payload.sub;
-    return this.authService.validateRefreshToken(userId, refreshToken);
+    return await this.authService.validateRefreshToken(userId, refreshToken);
   }
 }
