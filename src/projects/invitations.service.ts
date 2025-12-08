@@ -25,7 +25,12 @@ export class InvitationsService {
     );
   }
 
-  resendInvitation(projectId: string, email: string, roleId?: string, invitedBy?: string) {
+  resendInvitation(
+    projectId: string,
+    email: string,
+    roleId?: string,
+    invitedBy?: string,
+  ) {
     const token = randomBytes(24).toString('hex');
     const now = new Date();
     const record: InvitationRecord = {

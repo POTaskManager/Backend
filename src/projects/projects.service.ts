@@ -137,7 +137,12 @@ export class ProjectsService {
 
   async removeMember(projectId: string, userId: string) {
     const existing = await this.prisma.projectMembers.findUnique({
-      where: { prmb_ProjectId_prmb_UserId: { prmb_ProjectId: projectId, prmb_UserId: userId } },
+      where: {
+        prmb_ProjectId_prmb_UserId: {
+          prmb_ProjectId: projectId,
+          prmb_UserId: userId,
+        },
+      },
       select: { prmb_prmbId: true },
     });
     if (!existing) {
