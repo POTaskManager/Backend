@@ -3,7 +3,9 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Headers,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,6 +19,7 @@ import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { InvitationResendDto } from './dto/invitation-resend.dto';
 import { InvitationsService } from './invitations.service';
 import { ProjectsService } from './projects.service';
+import { ListMembersQueryDto } from './dto/list-members.query.dto';
 
 @Controller('projects')
 export class ProjectsController {
@@ -54,6 +57,18 @@ export class ProjectsController {
   @Delete(':id')
   delete(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.projectsService.delete(id);
+  }
+
+  @Get(':id/members')
+  listMembers(
+    @Param('id', new ParseUUIDPipe()) projectId: string,
+    @Query() query: ListMembersQueryDto,
+    @Headers('x-user-id') requesterId?: string,
+  ) {
+    if (!requesterId) {
+      throw new ForbiddenException('Missing project access');
+    }
+    return this.projectsService.listMembers(projectId, query, requesterId);
   }
 
   @Post(':id/members')

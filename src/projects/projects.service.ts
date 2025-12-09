@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { ListMembersQueryDto } from './dto/list-members.query.dto';
 
 @Injectable()
 export class ProjectsService {
@@ -117,6 +118,68 @@ export class ProjectsService {
       where: { proj_projId: id },
       select: { proj_projId: true },
     });
+  }
+
+  async listMembers(
+    projectId: string,
+    filters: ListMembersQueryDto,
+    requesterId?: string,
+  ) {
+    if (!requesterId) {
+      throw new ForbiddenException('Project membership required');
+    }
+
+    const membership = await this.prisma.projectMembers.findUnique({
+      where: {
+        prmb_ProjectId_prmb_UserId: {
+          prmb_ProjectId: projectId,
+          prmb_UserId: requesterId,
+        },
+      },
+      select: { prmb_prmbId: true },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('User is not a member of this project');
+    }
+
+    const members = await this.prisma.projectMembers.findMany({
+      where: { prmb_ProjectId: projectId },
+      include: { User: true, Role: true },
+    });
+
+    const filtered = filters.active === undefined
+      ? members
+      : members.filter((member) => member.User.user_IsActive === filters.active);
+
+    return filtered
+      .map((member) => {
+        const displayName = `${member.User.user_FirstName} ${member.User.user_LastName}`.trim();
+        return {
+          memberId: member.prmb_prmbId,
+          projectId: member.prmb_ProjectId,
+          role: member.Role
+            ? {
+                id: member.Role.role_roleId,
+                name: member.Role.role_Name,
+                description: member.Role.role_Description ?? null,
+              }
+            : null,
+          user: {
+            id: member.User.user_userId,
+            email: member.User.user_Email,
+            firstName: member.User.user_FirstName,
+            lastName: member.User.user_LastName,
+            displayName,
+            isActive: member.User.user_IsActive,
+          },
+        };
+      })
+      .sort((a, b) =>
+        a.user.displayName.localeCompare(b.user.displayName, 'pl', {
+          sensitivity: 'base',
+        }),
+      );
   }
 
   async addMember(projectId: string, dto: AddMemberDto) {
