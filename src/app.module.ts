@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BoardsModule } from './boards/boards.module';
+import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectDatabaseModule } from './project-database/project-database.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module';
     BoardsModule,
     SprintsModule,
     TasksModule,
+    ChatModule,
     AuthModule,
   ],
   controllers: [AppController],
