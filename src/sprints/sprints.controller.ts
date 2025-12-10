@@ -9,22 +9,28 @@ import {
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { SprintsService } from './sprints.service';
 
-@Controller('sprints')
+@Controller('projects/:projectId/sprints')
 export class SprintsController {
   constructor(private readonly sprintsService: SprintsService) {}
 
   @Post()
-  create(@Body() dto: CreateSprintDto) {
-    return this.sprintsService.create(dto);
+  create(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() dto: CreateSprintDto,
+  ) {
+    return this.sprintsService.create(projectId, dto);
   }
 
   @Get()
-  findAll() {
-    return this.sprintsService.findAll();
+  findAll(@Param('projectId', new ParseUUIDPipe()) projectId: string) {
+    return this.sprintsService.findAll(projectId);
   }
 
   @Get(':id')
-  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.sprintsService.findOne(id);
+  findOne(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.sprintsService.findOne(projectId, id);
   }
 }

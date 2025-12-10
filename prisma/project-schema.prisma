@@ -1,0 +1,207 @@
+generator project_client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma-project/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PROJECT_DATABASE_URL")
+}
+
+model chat_last_reads {
+  chat_id             String        @db.Uuid
+  user_id             String        @db.Uuid
+  last_read_messageid String?       @db.Uuid
+  last_read_at        DateTime?     @db.Timestamptz(6)
+  chatmessages        chatmessages? @relation(fields: [last_read_messageid], references: [chm_messageid], onUpdate: NoAction)
+
+  @@id([chat_id, user_id])
+  @@index([chat_id], map: "idx_clr_chat")
+  @@index([user_id], map: "idx_clr_user")
+}
+
+model chatcontainers {
+  chat_chatid     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chat_name       String?        @db.VarChar(255)
+  chat_created_by String         @db.Uuid
+  chat_created_at DateTime?      @default(now()) @db.Timestamp(6)
+  chatmessages    chatmessages[]
+}
+
+model chatmessages {
+  chm_messageid   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chm_chatid      String?           @db.Uuid
+  chm_userid      String            @db.Uuid
+  chm_message     String
+  chm_created_at  DateTime?         @default(now()) @db.Timestamp(6)
+  chat_last_reads chat_last_reads[]
+  chatcontainers  chatcontainers?   @relation(fields: [chm_chatid], references: [chat_chatid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model columns {
+  col_columnid   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  col_name       String     @db.VarChar(100)
+  col_order      Int        @unique(map: "idx_columns_col_order")
+  col_created_at DateTime?  @default(now()) @db.Timestamp(6)
+  statuses       statuses[]
+}
+
+model comments {
+  com_commentid  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  com_taskid     String?   @db.Uuid
+  com_userid     String    @db.Uuid
+  com_content    String
+  com_created_at DateTime? @default(now()) @db.Timestamp(6)
+  com_edited_at  DateTime? @db.Timestamp(6)
+  tasks          tasks?    @relation(fields: [com_taskid], references: [task_taskid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([com_taskid], map: "idx_comments_taskid")
+}
+
+model filereferences {
+  fr_id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fr_fileid          String?         @db.Uuid
+  fr_referencetypeid Int?
+  fr_referenceid     String          @db.Uuid
+  fr_created_at      DateTime?       @default(now()) @db.Timestamp(6)
+  fr_edited_at       DateTime?       @db.Timestamp(6)
+  fr_note            String?
+  files              files?          @relation(fields: [fr_fileid], references: [fil_fileid], onDelete: Cascade, onUpdate: NoAction)
+  referencetypes     referencetypes? @relation(fields: [fr_referencetypeid], references: [rt_rtid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model files {
+  fil_fileid      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fil_name        String           @db.VarChar(255)
+  fil_url         String
+  fil_uploaded_by String           @db.Uuid
+  fil_created_at  DateTime?        @default(now()) @db.Timestamp(6)
+  filereferences  filereferences[]
+}
+
+model labels {
+  lab_labelid    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lab_name       String       @db.VarChar(100)
+  lab_color      String?      @db.VarChar(20)
+  lab_created_at DateTime?    @default(now()) @db.Timestamp(6)
+  tasklabels     tasklabels[]
+}
+
+model referencetypes {
+  rt_rtid        Int              @id
+  rt_name        String           @db.VarChar(100)
+  filereferences filereferences[]
+}
+
+model sprints {
+  spr_sprintid   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  spr_name       String    @db.VarChar(255)
+  spr_start_date DateTime? @db.Date
+  spr_end_date   DateTime? @db.Date
+  spr_statusid   String?   @db.Uuid
+  spr_created_at DateTime? @default(now()) @db.Timestamp(6)
+  statuses       statuses? @relation(fields: [spr_statusid], references: [stat_statusid], onUpdate: NoAction)
+  tasks          tasks[]
+}
+
+model status_transitions {
+  st_id                                                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  st_from_statusid                                       String?   @db.Uuid
+  st_to_statusid                                         String?   @db.Uuid
+  statuses_status_transitions_st_from_statusidTostatuses statuses? @relation("status_transitions_st_from_statusidTostatuses", fields: [st_from_statusid], references: [stat_statusid], onDelete: Cascade, onUpdate: NoAction)
+  statuses_status_transitions_st_to_statusidTostatuses   statuses? @relation("status_transitions_st_to_statusidTostatuses", fields: [st_to_statusid], references: [stat_statusid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model statuses {
+  stat_statusid                                                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stat_name                                                        String               @db.VarChar(100)
+  stat_typeid                                                      Int
+  stat_columnid                                                    String?              @db.Uuid
+  stat_created_at                                                  DateTime?            @default(now()) @db.Timestamp(6)
+  sprints                                                          sprints[]
+  status_transitions_status_transitions_st_from_statusidTostatuses status_transitions[] @relation("status_transitions_st_from_statusidTostatuses")
+  status_transitions_status_transitions_st_to_statusidTostatuses   status_transitions[] @relation("status_transitions_st_to_statusidTostatuses")
+  columns                                                          columns?             @relation(fields: [stat_columnid], references: [col_columnid], onUpdate: NoAction)
+  statustypes                                                      statustypes          @relation(fields: [stat_typeid], references: [stattype_typeid], onDelete: Cascade, onUpdate: NoAction)
+  tasks                                                            tasks[]
+}
+
+model statustypes {
+  stattype_typeid      Int        @id
+  stattype_description String?    @db.VarChar(255)
+  stattype_created_at  DateTime?  @default(now()) @db.Timestamp(6)
+  statuses             statuses[]
+}
+
+model task_audit {
+  audit_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id        String?   @db.Uuid
+  operation      String?   @db.VarChar(20)
+  changed_by     String?   @db.Uuid
+  changed_at     DateTime? @default(now()) @db.Timestamptz(6)
+  changed_fields Json?
+  old            Json?
+  new            Json?
+  tasks          tasks?    @relation(fields: [task_id], references: [task_taskid], onUpdate: NoAction)
+
+  @@index([task_id], map: "idx_task_audit_taskid")
+}
+
+model task_audit_archive {
+  audit_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id        String?   @db.Uuid
+  operation      String?   @db.VarChar(20)
+  changed_by     String?   @db.Uuid
+  changed_at     DateTime? @default(now()) @db.Timestamptz(6)
+  changed_fields Json?
+  old            Json?
+  new            Json?
+
+  @@index([task_id], map: "idx_task_audit_archive_taskid")
+  @@index([task_id])
+}
+
+model taskcontributors {
+  tuc_id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tuc_taskid     String?   @db.Uuid
+  tuc_userid     String    @db.Uuid
+  tuc_role       String?   @db.VarChar(50)
+  tuc_created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tasks          tasks?    @relation(fields: [tuc_taskid], references: [task_taskid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tuc_taskid], map: "idx_taskcontributors_taskid")
+}
+
+model tasklabels {
+  tl_id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tl_taskid  String? @db.Uuid
+  tl_labelid String? @db.Uuid
+  labels     labels? @relation(fields: [tl_labelid], references: [lab_labelid], onDelete: Cascade, onUpdate: NoAction)
+  tasks      tasks?  @relation(fields: [tl_taskid], references: [task_taskid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tl_taskid], map: "idx_tasklabels_taskid")
+}
+
+model tasks {
+  task_taskid      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_title       String             @db.VarChar(255)
+  task_description String?
+  task_created_at  DateTime?          @default(now()) @db.Timestamp(6)
+  task_updated_at  DateTime?          @default(now()) @db.Timestamp(6)
+  task_statusid    String?            @db.Uuid
+  task_sprintid    String?            @db.Uuid
+  task_created_by  String             @db.Uuid
+  task_priority    Int?
+  task_due_at      DateTime?          @db.Timestamptz(6)
+  task_assigned_to String?            @db.Uuid
+  task_estimate    Int?
+  comments         comments[]
+  task_audit       task_audit[]
+  taskcontributors taskcontributors[]
+  tasklabels       tasklabels[]
+  sprints          sprints?           @relation(fields: [task_sprintid], references: [spr_sprintid], onUpdate: NoAction)
+  statuses         statuses?          @relation(fields: [task_statusid], references: [stat_statusid], onUpdate: NoAction)
+
+  @@index([task_assigned_to], map: "idx_tasks_assigned_to")
+  @@index([task_due_at], map: "idx_tasks_due_at")
+}

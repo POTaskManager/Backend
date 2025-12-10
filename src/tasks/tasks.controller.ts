@@ -9,22 +9,30 @@ import {
 import { CreateTaskDto } from './dto/create-task.dto';
 import { TasksService } from './tasks.service';
 
-@Controller('tasks')
+@Controller('projects/:projectId/tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  create(@Body() dto: CreateTaskDto) {
+  create(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() dto: CreateTaskDto,
+  ) {
+    // Override projectId from URL (security: prevent body manipulation)
+    dto.projectId = projectId;
     return this.tasksService.create(dto);
   }
 
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(@Param('projectId', new ParseUUIDPipe()) projectId: string) {
+    return this.tasksService.findAll(projectId);
   }
 
   @Get(':id')
-  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.tasksService.findOne(id);
+  findOne(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.tasksService.findOne(projectId, id);
   }
 }

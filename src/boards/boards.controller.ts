@@ -9,22 +9,28 @@ import {
 import { BoardsService } from './boards.service';
 import { CreateBoardDto } from './dto/create-board.dto';
 
-@Controller('boards')
+@Controller('projects/:projectId/boards')
 export class BoardsController {
   constructor(private readonly boardsService: BoardsService) {}
 
   @Post()
-  create(@Body() dto: CreateBoardDto) {
-    return this.boardsService.create(dto);
+  create(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() dto: CreateBoardDto,
+  ) {
+    return this.boardsService.create(projectId, dto);
   }
 
   @Get()
-  findAll() {
-    return this.boardsService.findAll();
+  findAll(@Param('projectId', new ParseUUIDPipe()) projectId: string) {
+    return this.boardsService.findAll(projectId);
   }
 
   @Get(':id')
-  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.boardsService.findOne(id);
+  findOne(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.boardsService.findOne(projectId, id);
   }
 }

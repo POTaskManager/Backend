@@ -1,59 +1,116 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectDatabaseService } from '../project-database/project-database.service';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 
 @Injectable()
 export class SprintsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectDb: ProjectDatabaseService,
+  ) {}
 
-  create(dto: CreateSprintDto) {
-    return this.prisma.sprints.create({
+  async create(projectId: string, dto: CreateSprintDto) {
+    // Get project to find namespace
+    const project = await this.prisma.projects.findUnique({
+      where: { proj_projid: projectId },
+      select: { proj_db_namespace: true },
+    });
+
+    if (!project || !project.proj_db_namespace) {
+      throw new NotFoundException(
+        `Project ${projectId} not found or has no database`,
+      );
+    }
+
+    // Get project-specific client
+    const projectClient = await this.projectDb.getProjectClient(
+      project.proj_db_namespace,
+    );
+
+    // Create sprint in project database
+    return projectClient.sprints.create({
       data: {
-        spr_BoardId: dto.boardId,
-        spr_Name: dto.name,
-        spr_StartDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        spr_EndDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        spr_Goal: dto.goal,
-        spr_State: dto.state,
+        spr_name: dto.name,
+        spr_start_date: dto.startDate ? new Date(dto.startDate) : undefined,
+        spr_end_date: dto.endDate ? new Date(dto.endDate) : undefined,
       },
       select: {
-        spr_sprId: true,
-        spr_BoardId: true,
-        spr_Name: true,
-        spr_StartDate: true,
-        spr_EndDate: true,
-        spr_Goal: true,
-        spr_State: true,
+        spr_sprintid: true,
+        spr_name: true,
+        spr_start_date: true,
+        spr_end_date: true,
+        spr_statusid: true,
       },
     });
   }
 
-  findAll() {
-    return this.prisma.sprints.findMany({
+  async findAll(projectId: string) {
+    // Get project to find namespace
+    const project = await this.prisma.projects.findUnique({
+      where: { proj_projid: projectId },
+      select: { proj_db_namespace: true },
+    });
+
+    if (!project || !project.proj_db_namespace) {
+      throw new NotFoundException(
+        `Project ${projectId} not found or has no database`,
+      );
+    }
+
+    // Get project-specific client
+    const projectClient = await this.projectDb.getProjectClient(
+      project.proj_db_namespace,
+    );
+
+    // Fetch sprints from project database
+    return projectClient.sprints.findMany({
       select: {
-        spr_sprId: true,
-        spr_BoardId: true,
-        spr_Name: true,
-        spr_StartDate: true,
-        spr_EndDate: true,
-        spr_Goal: true,
-        spr_State: true,
+        spr_sprintid: true,
+        spr_name: true,
+        spr_start_date: true,
+        spr_end_date: true,
+        spr_statusid: true,
       },
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.sprints.findUnique({
-      where: { spr_sprId: id },
+  async findOne(projectId: string, id: string) {
+    // Get project to find namespace
+    const project = await this.prisma.projects.findUnique({
+      where: { proj_projid: projectId },
+      select: { proj_db_namespace: true },
+    });
+
+    if (!project || !project.proj_db_namespace) {
+      throw new NotFoundException(
+        `Project ${projectId} not found or has no database`,
+      );
+    }
+
+    // Get project-specific client
+    const projectClient = await this.projectDb.getProjectClient(
+      project.proj_db_namespace,
+    );
+
+    // Fetch sprint from project database
+    const sprint = await projectClient.sprints.findUnique({
+      where: { spr_sprintid: id },
       select: {
-        spr_sprId: true,
-        spr_BoardId: true,
-        spr_Name: true,
-        spr_StartDate: true,
-        spr_EndDate: true,
-        spr_Goal: true,
-        spr_State: true,
+        spr_sprintid: true,
+        spr_name: true,
+        spr_start_date: true,
+        spr_end_date: true,
+        spr_statusid: true,
       },
     });
+
+    if (!sprint) {
+      throw new NotFoundException(
+        `Sprint ${id} not found in project ${projectId}`,
+      );
+    }
+
+    return sprint;
   }
 }

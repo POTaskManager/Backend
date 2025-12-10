@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BoardsModule } from './boards/boards.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProjectDatabaseModule } from './project-database/project-database.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SprintsModule } from './sprints/sprints.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
       }),
     }),
     PrismaModule,
+    ProjectDatabaseModule,
     UsersModule,
     ProjectsModule,
     BoardsModule,
