@@ -7,10 +7,11 @@ import {
   Length,
 } from 'class-validator';
 
-export class CreateSprintDto {
+export class UpdateSprintDto {
+  @IsOptional()
   @IsString()
   @Length(1, 255)
-  name!: string;
+  name?: string;
 
   @IsOptional()
   @IsString()
@@ -27,5 +28,10 @@ export class CreateSprintDto {
   @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
-  taskIds?: string[];
+  addTaskIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  removeTaskIds?: string[];
 }

@@ -94,14 +94,18 @@ model referencetypes {
 }
 
 model sprints {
-  spr_sprintid   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  spr_name       String    @db.VarChar(255)
-  spr_start_date DateTime? @db.Date
-  spr_end_date   DateTime? @db.Date
-  spr_statusid   String?   @db.Uuid
-  spr_created_at DateTime? @default(now()) @db.Timestamp(6)
-  statuses       statuses? @relation(fields: [spr_statusid], references: [stat_statusid], onUpdate: NoAction)
-  tasks          tasks[]
+  spr_sprintid     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  spr_name         String    @db.VarChar(255)
+  spr_start_date   DateTime? @db.Date
+  spr_end_date     DateTime? @db.Date
+  spr_statusid     String?   @db.Uuid
+  spr_created_at   DateTime? @default(now()) @db.Timestamp(6)
+  spr_goal         String?
+  spr_velocity     Int?      @default(0)
+  spr_completed_at DateTime? @db.Timestamptz(6)
+  spr_created_by   String?   @db.Uuid
+  statuses         statuses? @relation(fields: [spr_statusid], references: [stat_statusid], onUpdate: NoAction)
+  tasks            tasks[]
 }
 
 model status_transitions {
