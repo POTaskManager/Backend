@@ -3,7 +3,7 @@ import { IsString, IsOptional, IsArray, IsUUID } from 'class-validator';
 export class CreateChatDto {
   @IsString()
   @IsOptional()
-  chat_name?: string;
+  chatName?: string;
 
   @IsArray()
   @IsUUID('4', { each: true })

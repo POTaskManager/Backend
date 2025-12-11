@@ -98,9 +98,9 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = compare(password, user.user_password_hash);
+    const isPasswordMatch = await argon2.verify(user.user_password_hash, password);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
-    return user;
+    return { id: user.user_userid, email: user.user_email };
   }
 }

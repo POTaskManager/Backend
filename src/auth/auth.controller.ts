@@ -18,6 +18,7 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
+  @Public()
   @Post('login')
   @UseGuards(LocalAuthGuard)
   async login(
@@ -34,6 +35,7 @@ export class AuthController {
       httpOnly: true,
       secure: true,
     });
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)

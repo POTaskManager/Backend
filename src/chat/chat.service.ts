@@ -52,7 +52,7 @@ export class ChatService {
     // Create chat container
     const chat = await projectDb.chatcontainers.create({
       data: {
-        chat_name: createChatDto.chat_name,
+        chat_name: createChatDto.chatName,
         chat_created_by: userId,
       },
     });

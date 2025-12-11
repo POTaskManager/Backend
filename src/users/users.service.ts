@@ -60,6 +60,7 @@ export class UsersService {
       select: {
         user_userid: true,
         user_name: true,
+        user_email: true,
         user_password_hash: true,
       },
     });

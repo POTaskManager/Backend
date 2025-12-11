@@ -21,9 +21,9 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
-@Controller('api/projects/:projectId/chats')
+@Controller('projects/:projectId/chats')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
@@ -36,14 +36,14 @@ export class ChatController {
   ) {
     return this.chatService.createChat(
       projectId,
-      req.user.userId,
+      req.user.id,
       createChatDto,
     );
   }
 
   @Get()
   async getUserChats(@Param('projectId') projectId: string, @Req() req: any) {
-    return this.chatService.getUserChats(projectId, req.user.userId);
+    return this.chatService.getUserChats(projectId, req.user.id);
   }
 
   @Get(':chatId/messages')
@@ -58,7 +58,7 @@ export class ChatController {
     return this.chatService.getChatHistory(
       projectId,
       chatId,
-      req.user.userId,
+      req.user.id,
       limitNum,
       before,
     );
@@ -72,7 +72,7 @@ export class ChatController {
   ) {
     return this.chatService.sendMessage(
       projectId,
-      req.user.userId,
+      req.user.id,
       sendMessageDto,
     );
   }
@@ -87,7 +87,7 @@ export class ChatController {
     return this.chatService.updateMessage(
       projectId,
       messageId,
-      req.user.userId,
+      req.user.id,
       updateMessageDto,
     );
   }
@@ -98,7 +98,7 @@ export class ChatController {
     @Param('messageId') messageId: string,
     @Req() req: any,
   ) {
-    return this.chatService.deleteMessage(projectId, messageId, req.user.userId);
+    return this.chatService.deleteMessage(projectId, messageId, req.user.id);
   }
 
   @Post(':chatId/read/:messageId')
@@ -112,7 +112,7 @@ export class ChatController {
       projectId,
       chatId,
       messageId,
-      req.user.userId,
+      req.user.id,
     );
   }
 
@@ -122,7 +122,7 @@ export class ChatController {
       storage: diskStorage({
         destination: './uploads/chat',
         filename: (req, file, callback) => {
-          const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+          const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
           callback(null, uniqueName);
         },
       }),
@@ -174,7 +174,7 @@ export class ChatController {
 
     return this.chatService.uploadFile(
       projectId,
-      req.user.userId,
+      req.user.id,
       file.originalname,
       fileUrl,
     );
