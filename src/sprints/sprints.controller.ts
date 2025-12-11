@@ -33,4 +33,12 @@ export class SprintsController {
   ) {
     return this.sprintsService.findOne(projectId, id);
   }
+
+  @Get(':id/view')
+  getSprintView(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) sprintId: string,
+  ) {
+    return this.sprintsService.getSprintView(projectId, sprintId);
+  }
 }
