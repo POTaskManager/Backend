@@ -23,6 +23,9 @@ export enum TaskState {
 
 export class CreateTaskDto {
   @IsUUID()
+  projectId!: string;
+
+  @IsUUID()
   boardId!: string;
 
   @IsOptional()

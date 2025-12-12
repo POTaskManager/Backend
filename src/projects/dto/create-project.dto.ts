@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsDateString,
   IsOptional,
   IsString,
@@ -19,14 +20,7 @@ export class CreateProjectDto {
   ownerId!: string;
 
   @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @IsString()
-  @Length(2, 50)
-  state!: string;
+  @IsArray()
+  @IsUUID('4', { each: true })
+  memberIds?: string[];
 }

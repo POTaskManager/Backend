@@ -6,8 +6,14 @@ import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
+  
+  // Configure CORS based on environment
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+    : '*';
+  
   app.enableCors({
-    origin: '*',
+    origin: corsOrigin,
     credentials: true,
   });
   app.use(cookieParser());
@@ -18,6 +24,6 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 4200);
 }
 bootstrap();

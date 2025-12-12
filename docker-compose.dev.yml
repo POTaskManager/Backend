@@ -1,43 +1,43 @@
 version: "3.9"
 
 services:
-  db:
-    image: postgres:16
-    container_name: backend-dev-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: backend_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     build:
       context: .
       dockerfile: Dockerfile.dev
     container_name: backend-dev-app
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/backend_db?schema=public
+      # Global database (connecting to external PostgreSQL container)
+      DATABASE_URL: postgresql://postgres:changeme@db:5432/globaldb?schema=public
+      
+      # Project database template (for Prisma CLI only)
+      PROJECT_DATABASE_URL: postgresql://postgres:changeme@db:5432/project_default?schema=public
+      
+      # Dynamic project database configuration
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: changeme
+      DB_PROJECT_PREFIX: project_
+      
+      # OAuth & JWT
       OAUTH_ENCRYPTION_KEY: devsecretdevsecretdevsecretdev12
-      PORT: 3000
+      JWT_SECRET: dev-jwt-secret-key-change-in-production
+      JWT_REFRESH_SECRET: dev-jwt-refresh-secret-change-in-production
+      
+      # Server
+      PORT: 4200
+      NODE_ENV: development
     ports:
-      - "3000:3000"
+      - "4200:4200"
     volumes:
       - .:/app
       - /app/node_modules
     command: ["npm", "run", "start:dev"]
 
-volumes:
-  pgdata:
+# Connect to external PostgreSQL container network
+networks:
+  default:
+    name: database_default
+    external: true

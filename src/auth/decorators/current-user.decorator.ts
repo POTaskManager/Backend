@@ -1,10 +1,10 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Users } from '@prisma/client';
+import { User } from '@prisma/client';
 
 // Safe user type without password hash (what gets attached to request by strategies)
-export type SafeUser = Omit<Users, 'user_PasswordHash'>;
+export type SafeUser = Omit<User, 'passwordHash'>;
 
-const getCurrentUserByContext = (context: ExecutionContext): Users => {
+const getCurrentUserByContext = (context: ExecutionContext): User => {
   if (context.getType() === 'http') {
     const request = context.switchToHttp().getRequest();
     return request.user;

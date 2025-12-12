@@ -20,17 +20,17 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = await compare(password, user.user_PasswordHash);
+    const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
 
-    return { id: user.user_userId };
+    return { id: user.id };
   }
 
   async login(userId: string) {
     const { accessToken, refreshToken } = await this.generateTokens(userId);
     const hashedRefreshToken = await argon2.hash(refreshToken);
-    await this.userService.updateHashedRefreshToken(userId, hashedRefreshToken);
+    await this.userService.createOrUpdateSession(userId, hashedRefreshToken);
     return {
       id: userId,
       accessToken,
@@ -55,7 +55,7 @@ export class AuthService {
   async refreshToken(userId: string) {
     const { accessToken, refreshToken } = await this.generateTokens(userId);
     const hashedRefreshToken = await argon2.hash(refreshToken);
-    await this.userService.updateHashedRefreshToken(userId, hashedRefreshToken);
+    await this.userService.createOrUpdateSession(userId, hashedRefreshToken);
     return {
       id: userId,
       accessToken,
@@ -64,12 +64,12 @@ export class AuthService {
   }
 
   async validateRefreshToken(userId: string, refreshToken: string) {
-    const user = await this.userService.findOne(userId);
-    if (!user || !user.user_HashedRefreshToken)
+    const session = await this.userService.getUserSession(userId);
+    if (!session || !session.refreshTokenHash)
       throw new UnauthorizedException('Invalid Refresh Token');
 
     const refreshTokenMatches = await argon2.verify(
-      user.user_HashedRefreshToken,
+      session.refreshTokenHash,
       refreshToken,
     );
     if (!refreshTokenMatches)
@@ -79,13 +79,13 @@ export class AuthService {
   }
 
   async signOut(userId: string) {
-    await this.userService.updateHashedRefreshToken(userId, null);
+    await this.userService.revokeSession(userId);
   }
 
   async validateJwtUser(userId: string) {
     const user = await this.userService.findOne(userId);
     if (!user) throw new UnauthorizedException('User not found!');
-    const currentUser: CurrentUser = { id: user.user_userId };
+    const currentUser: CurrentUser = { id: user.id };
     return currentUser;
   }
 
@@ -98,9 +98,9 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = compare(password, user.user_PasswordHash);
+    const isPasswordMatch = await argon2.verify(user.passwordHash, password);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
-    return user;
+    return { id: user.id, email: user.email };
   }
 }

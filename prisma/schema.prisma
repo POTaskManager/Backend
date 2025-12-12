@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,203 +7,154 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ========== USERS ========== */
-model Users {
-  user_userId       String   @id @default(uuid())
-  user_FirstName    String
-  user_LastName     String
-  user_Email        String   @unique
-  user_PasswordHash String
-  user_IsActive     Boolean  @default(true)
-  user_CreationDate DateTime @default(now())
-  user_LastLogin    DateTime?
-  user_HashedRefreshToken String? 
+model ProjectAccess {
+  accessId   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("pac_accessid")
+  userId     String    @db.Uuid @map("pac_userid")
+  projectId  String    @db.Uuid @map("pac_projectid")
+  role       String?   @db.VarChar(50) @map("pac_role")
+  invitedAt  DateTime? @db.Timestamp(6) @map("pac_invited_at")
+  accepted   Boolean?  @default(false) @map("pac_accepted")
+  createdAt  DateTime? @default(now()) @db.Timestamp(6) @map("pac_created_at")
+  roleId     String?   @db.Uuid @map("pac_role_id")
+  updatedAt  DateTime? @db.Timestamp(6) @map("updated_at")
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roleRef    Role?     @relation(fields: [roleId], references: [id], onUpdate: NoAction)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  // relations
-  ProjectsOwned   Projects[]        @relation("Projects_Owner")
-  ProjectMembers  ProjectMembers[]
-  TasksAssigned   Tasks[]           @relation("Tasks_Assigned")
-  TasksCreated    Tasks[]           @relation("Tasks_Created")
-  Comments        Comments[]
-  Messages        Messages[]        @relation("Messages_Sent")
-  Notifications   Notifications[]
-  ActivityLogs    ActivityLog[]
-
-  @@map("Users")
+  @@index([projectId], map: "idx_projectaccess_project")
+  @@index([userId], map: "idx_projectaccess_user")
+  @@map("projectaccess")
 }
 
-/* ========== ROLES ========== */
-model Roles {
-  role_roleId     String @id @default(uuid())
-  role_Name       String @unique
-  role_Description String?
+model Project {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("proj_projid")
+  name             String               @db.VarChar(255) @map("proj_name")
+  dbNamespace      String               @unique @db.VarChar(255) @map("proj_db_namespace")
+  createdBy        String?              @db.Uuid @map("proj_created_by")
+  createdAt        DateTime?            @default(now()) @db.Timestamp(6) @map("proj_created_at")
+  description      String?              @map("proj_description")
+  updatedAt        DateTime?            @db.Timestamp(6) @map("updated_at")
+  projectAccess    ProjectAccess[]
+  accessAudits     ProjectAccessAudit[]
+  creator          User?                @relation(fields: [createdBy], references: [id], onUpdate: NoAction)
 
-  Members ProjectMembers[]
-
-  @@map("Roles")
+  @@map("projects")
 }
 
-/* ========== PROJECTS ========== */
-model Projects {
-  proj_projId       String   @id @default(uuid())
-  proj_Name         String
-  proj_Description  String?
-  proj_OwnerId      String
-  proj_StartDate    DateTime?
-  proj_EndDate      DateTime?
-  proj_State        String
-  proj_CreationDate DateTime @default(now())
+model Role {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("role_roleid")
+  name          String          @db.VarChar(100) @map("role_name")
+  projectAccess ProjectAccess[]
 
-  // relations
-  Owner    Users    @relation("Projects_Owner", fields: [proj_OwnerId], references: [user_userId])
-  Members  ProjectMembers[]
-  Boards   Boards[]
-  Messages Messages[]
-
-  @@index([proj_OwnerId])
-  @@map("Projects")
+  @@map("roles")
 }
 
-/* ========== PROJECT MEMBERS ========== */
-model ProjectMembers {
-  prmb_prmbId   String @id @default(uuid())
-  prmb_ProjectId String
-  prmb_UserId    String
-  prmb_RoleId    String
+model Session {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("session_id")
+  userId                String?                  @db.Uuid @map("user_id")
+  refreshTokenHash      String?                  @map("refresh_token_hash")
+  expiresAt             DateTime?                @db.Timestamp(6) @map("expires_at")
+  lastSeenAt            DateTime?                @db.Timestamp(6) @map("last_seen_at")
+  revoked               Boolean?                 @default(false)
+  userAgent             String?                  @map("user_agent")
+  ipAddress             String?                  @db.Inet @map("ip_address")
+  createdAt             DateTime?                @default(now()) @db.Timestamp(6) @map("created_at")
+  meta                  Json?
+  refreshTokenBlacklist RefreshTokenBlacklist[]
+  user                  User?                    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sessions_userid_fkey")
 
-  Project Projects @relation(fields: [prmb_ProjectId], references: [proj_projId])
-  User    Users    @relation(fields: [prmb_UserId], references: [user_userId])
-  Role    Roles    @relation(fields: [prmb_RoleId], references: [role_roleId])
-
-  @@unique([prmb_ProjectId, prmb_UserId]) // jeden user unikatowo w projekcie
-  @@index([prmb_ProjectId])
-  @@index([prmb_UserId])
-  @@index([prmb_RoleId])
-  @@map("ProjectMembers")
+  @@map("sessions")
 }
 
-/* ========== BOARDS ========== */
-model Boards {
-  board_boardId      String   @id @default(uuid())
-  board_ProjectId    String
-  board_Type         String
-  board_Name         String
-  board_CreationDate DateTime @default(now())
+model UserIdentity {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("identity_id")
+  userId         String?   @db.Uuid @map("user_id")
+  provider       String    @db.VarChar(100)
+  providerUserId String    @db.VarChar(255) @map("provider_user_id")
+  providerEmail  String?   @db.Citext @map("provider_email")
+  createdAt      DateTime? @default(now()) @db.Timestamp(6) @map("created_at")
+  emailVerified  Boolean?  @default(false) @map("email_verified")
+  displayName    String?   @db.VarChar(255) @map("display_name")
+  avatarUrl      String?   @map("avatar_url")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  Project Projects @relation(fields: [board_ProjectId], references: [proj_projId])
-  Sprints Sprints[]
-  Tasks   Tasks[]
-
-  @@index([board_ProjectId])
-  @@map("Boards")
+  @@unique([provider, providerUserId], map: "user_identities_provider_userid_key")
+  @@map("user_identities")
 }
 
-/* ========== SPRINTS ========== */
-model Sprints {
-  spr_sprId    String   @id @default(uuid())
-  spr_BoardId  String
-  spr_Name     String
-  spr_StartDate DateTime?
-  spr_EndDate   DateTime?
-  spr_Goal      String?
-  spr_State     String
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model User {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("user_userid")
+  email          String               @unique @db.Citext @map("user_email")
+  passwordHash   String               @db.VarChar(255) @map("user_password_hash")
+  name           String?              @db.VarChar(100) @map("user_name")
+  createdAt      DateTime?            @default(now()) @db.Timestamp(6) @map("user_created_at")
+  emailVerified  Boolean?             @default(false) @map("user_email_verified")
+  lastLogin      DateTime?            @db.Timestamp(6) @map("last_login")
+  isActive       Boolean?             @default(true) @map("is_active")
+  updatedAt      DateTime?            @db.Timestamp(6) @map("updated_at")
+  projectAccess  ProjectAccess[]
+  accessAudits   ProjectAccessAudit[]
+  projects       Project[]
+  sessions       Session[]
+  userAudits     UserAudit[]
+  identities     UserIdentity[]
+  settings       UserSettings[]
 
-  Board Boards @relation(fields: [spr_BoardId], references: [board_boardId])
-  Tasks Tasks[]
-
-  @@index([spr_BoardId])
-  @@map("Sprints")
+  @@map("users")
 }
 
-/* ========== TASKS ========== */
-model Tasks {
-  task_taskId           String   @id @default(uuid())
-  task_BoardId          String
-  task_SprintId         String?
-  task_AssignedTo       String?
-  task_CreationBy       String
-  task_CreationDate     DateTime @default(now())
-  task_Title            String
-  task_Description      String?
-  task_State            String
-  task_Priority         String
-  task_ModificationDate DateTime @updatedAt
-  task_DueDate          DateTime?
+model UserSettings {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("uset_settingsid")
+  userId               String?  @db.Uuid @map("uset_userid")
+  theme                String?  @db.VarChar(50) @map("uset_theme")
+  language             String?  @db.VarChar(10) @map("uset_language")
+  notificationsEnabled Boolean? @default(true) @map("uset_notifications_enabled")
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  Board    Boards   @relation(fields: [task_BoardId], references: [board_boardId])
-  Sprint   Sprints? @relation(fields: [task_SprintId], references: [spr_sprId])
-  Assignee Users?   @relation("Tasks_Assigned", fields: [task_AssignedTo], references: [user_userId])
-  Creator  Users    @relation("Tasks_Created", fields: [task_CreationBy], references: [user_userId])
-  Comments Comments[]
-
-  @@index([task_BoardId])
-  @@index([task_SprintId])
-  @@index([task_AssignedTo])
-  @@index([task_CreationBy])
-  @@map("Tasks")
+  @@map("usersettings")
 }
 
+model ProjectAccessAudit {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("audit_id")
+  accessId      String?   @db.Uuid @map("pac_accessid")
+  projectId     String?   @db.Uuid @map("project_id")
+  userId        String?   @db.Uuid @map("user_id")
+  operation     String?   @db.VarChar(20)
+  changedBy     String?   @db.Uuid @map("changed_by")
+  changedAt     DateTime? @default(now()) @db.Timestamp(6) @map("changed_at")
+  changedFields Json?     @map("changed_fields")
+  old           Json?
+  new           Json?
+  project       Project?  @relation(fields: [projectId], references: [id], onUpdate: NoAction)
+  user          User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
-/* ========== COMMENTS ========== */
-model Comments {
-  com_comId        String   @id @default(uuid())
-  com_TaskId       String
-  com_CreationBy   String
-  com_Content      String
-  com_CreationDate DateTime @default(now())
-
-  Task    Tasks @relation(fields: [com_TaskId], references: [task_taskId])
-  Creator Users @relation(fields: [com_CreationBy], references: [user_userId])
-
-  @@index([com_TaskId])
-  @@index([com_CreationBy])
-  @@map("Comments")
+  @@index([projectId], map: "idx_pac_audit_project")
+  @@index([userId], map: "idx_pac_audit_user")
+  @@map("projectaccess_audit")
 }
 
-/* ========== MESSAGES (chat projektowy) ========== */
-model Messages {
-  msg_msgId       String   @id @default(uuid())
-  msg_ProjectId   String
-  msg_SenderId    String
-  msg_Content     String
-  msg_CreationDate DateTime @default(now())
+model RefreshTokenBlacklist {
+  tokenHash     String    @id @map("token_hash")
+  sessionId     String?   @db.Uuid @map("session_id")
+  blacklistedAt DateTime? @default(now()) @db.Timestamp(6) @map("blacklisted_at")
+  expiresAt     DateTime? @db.Timestamp(6) @map("expires_at")
+  reason        String?
+  session       Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  Project Projects @relation(fields: [msg_ProjectId], references: [proj_projId])
-  Sender  Users    @relation("Messages_Sent", fields: [msg_SenderId], references: [user_userId])
-
-  @@index([msg_ProjectId])
-  @@index([msg_SenderId])
-  @@map("Messages")
+  @@map("refresh_token_blacklist")
 }
 
-/* ========== NOTIFICATIONS ========== */
-model Notifications {
-  not_notId        String   @id @default(uuid())
-  not_UserId       String
-  not_Type         String
-  not_Content      String
-  not_IsRead       Boolean  @default(false)
-  not_CreationDate DateTime @default(now())
+model UserAudit {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("audit_id")
+  userId        String?   @db.Uuid @map("user_id")
+  operation     String?   @db.VarChar(20)
+  changedBy     String?   @db.Uuid @map("changed_by")
+  changedAt     DateTime? @default(now()) @db.Timestamp(6) @map("changed_at")
+  changedFields Json?     @map("changed_fields")
+  old           Json?
+  new           Json?
+  user          User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
-  User Users @relation(fields: [not_UserId], references: [user_userId])
-
-  @@index([not_UserId])
-  @@map("Notifications")
-}
-
-/* ========== ACTIVITY LOG ========== */
-model ActivityLog {
-  actlog_actlogId    String   @id @default(uuid())
-  actlog_UserId      String
-  actlog_EntityType  String
-  actlog_EntityId    String
-  actlog_Action      String
-  actlog_Description String?
-  actlog_CreationDate DateTime @default(now())
-
-  User Users @relation(fields: [actlog_UserId], references: [user_userId])
-
-  @@index([actlog_UserId])
-  @@index([actlog_EntityType, actlog_EntityId])
-  @@map("ActivityLog")
+  @@map("user_audit")
 }

@@ -10,61 +10,58 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const passwordHash = this.hashPassword(dto.password);
 
-    return this.prisma.users.create({
+    return this.prisma.user.create({
       data: {
-        user_FirstName: dto.firstName,
-        user_LastName: dto.lastName,
-        user_Email: dto.email,
-        user_PasswordHash: passwordHash,
+        name: dto.firstName + ' ' + dto.lastName,
+        email: dto.email,
+        passwordHash: dto.password,
       },
       select: {
-        user_userId: true,
-        user_FirstName: true,
-        user_LastName: true,
-        user_Email: true,
-        user_IsActive: true,
-        user_CreationDate: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
       },
     });
   }
 
   findAll() {
-    return this.prisma.users.findMany({
+    return this.prisma.user.findMany({
       select: {
-        user_userId: true,
-        user_FirstName: true,
-        user_LastName: true,
-        user_Email: true,
-        user_IsActive: true,
-        user_CreationDate: true,
-        user_LastLogin: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        lastLogin: true,
       },
     });
   }
 
   findOne(id: string) {
-    return this.prisma.users.findUnique({
-      where: { user_userId: id },
+    return this.prisma.user.findUnique({
+      where: { id },
       select: {
-        user_userId: true,
-        user_FirstName: true,
-        user_LastName: true,
-        user_Email: true,
-        user_IsActive: true,
-        user_CreationDate: true,
-        user_LastLogin: true,
-        user_HashedRefreshToken: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        lastLogin: true,
+        passwordHash: true,
       },
     });
   }
 
   findByEmail(email: string) {
-    return this.prisma.users.findUnique({
-      where: { user_Email: email },
+    return this.prisma.user.findUnique({
+      where: { email },
       select: {
-        user_userId: true,
-        user_FirstName: true,
-        user_PasswordHash: true,
+        id: true,
+        name: true,
+        email: true,
+        passwordHash: true,
       },
     });
   }
@@ -73,10 +70,44 @@ export class UsersService {
     return createHash('sha256').update(raw).digest('hex');
   }
 
-  updateHashedRefreshToken(userId: string, hashedRefreshToken: string | null) {
-    return this.prisma.users.update({
-      where: { user_userId: userId },
-      data: { user_HashedRefreshToken: hashedRefreshToken },
+  async createOrUpdateSession(userId: string, hashedRefreshToken: string) {
+    const existingSession = await this.prisma.session.findFirst({
+      where: { userId, revoked: false },
+    });
+
+    if (existingSession) {
+      return this.prisma.session.update({
+        where: { id: existingSession.id },
+        data: {
+          refreshTokenHash: hashedRefreshToken,
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+
+    return this.prisma.session.create({
+      data: {
+        userId,
+        refreshTokenHash: hashedRefreshToken,
+        lastSeenAt: new Date(),
+      },
+    });
+  }
+
+  async getUserSession(userId: string) {
+    return this.prisma.session.findFirst({
+      where: { userId, revoked: false },
+      select: {
+        id: true,
+        refreshTokenHash: true,
+      },
+    });
+  }
+
+  async revokeSession(userId: string) {
+    return this.prisma.session.updateMany({
+      where: { userId, revoked: false },
+      data: { revoked: true },
     });
   }
 }
