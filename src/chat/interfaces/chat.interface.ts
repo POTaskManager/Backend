@@ -1,26 +1,26 @@
 export interface ChatMessage {
-  chm_messageid: string;
-  chm_chatid: string | null;
-  chm_userid: string;
-  chm_message: string;
-  chm_created_at: Date | null;
+  id: string;
+  chatId: string | null;
+  userId: string;
+  message: string;
+  createdAt: Date | null;
   user?: {
-    user_userid: string;
-    user_name: string | null;
-    user_email: string;
+    id: string;
+    name: string | null;
+    email: string;
   };
   files?: Array<{
-    fil_fileid: string;
-    fil_name: string;
-    fil_url: string;
+    id: string;
+    name: string;
+    url: string;
   }>;
 }
 
 export interface ChatContainer {
-  chat_chatid: string;
-  chat_name: string | null;
-  chat_created_by: string;
-  chat_created_at: Date | null;
+  id: string;
+  name: string | null;
+  createdBy: string;
+  createdAt: Date | null;
   lastMessage?: ChatMessage;
   unreadCount?: number;
 }

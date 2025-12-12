@@ -92,7 +92,7 @@ export class ChatGateway
 
       // Verify user has access to this chat through ChatService
       const chats = await this.chatService.getUserChats(data.projectId, userId);
-      const hasAccess = chats.some((chat) => chat.chat_chatid === data.chatId);
+      const hasAccess = chats.some((chat) => chat.id === data.chatId);
 
       if (!hasAccess) {
         throw new WsException('You do not have access to this chat');
@@ -211,10 +211,10 @@ export class ChatGateway
       );
 
       // Broadcast to all users in the chat room
-      this.server.to(message.chm_chatid!).emit('message_updated', {
+      this.server.to(message.chatId!).emit('message_updated', {
         type: 'message_updated',
         message,
-        chatId: message.chm_chatid,
+        chatId: message.chatId,
       });
 
       this.logger.log(`Message ${data.messageId} updated by user ${userId}`);

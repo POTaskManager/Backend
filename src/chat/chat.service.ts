@@ -24,8 +24,8 @@ export class ChatService {
     createChatDto: CreateChatDto,
   ) {
     // Get project namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -33,10 +33,10 @@ export class ChatService {
     }
 
     // Verify user has access to project
-    const access = await this.prisma.projectaccess.findFirst({
+    const access = await this.prisma.projectAccess.findFirst({
       where: {
-        pac_projectid: projectId,
-        pac_userid: userId,
+        projectId: projectId,
+        userId: userId,
       },
     });
 
@@ -46,23 +46,23 @@ export class ChatService {
 
     // Get project database client
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Create chat container
-    const chat = await projectDb.chatcontainers.create({
+    const chat = await projectDb.chatContainer.create({
       data: {
-        chat_name: createChatDto.chatName,
-        chat_created_by: userId,
+        name: createChatDto.chatName,
+        createdBy: userId,
       },
     });
 
     // Initialize chat_last_reads for creator
-    await projectDb.chat_last_reads.create({
+    await projectDb.chatLastRead.create({
       data: {
-        chat_id: chat.chat_chatid,
-        user_id: userId,
-        last_read_at: new Date(),
+        chatId: chat.id,
+        userId: userId,
+        lastReadAt: new Date(),
       },
     });
 
@@ -74,11 +74,11 @@ export class ChatService {
 
       await Promise.all(
         uniqueMemberIds.map((memberId) =>
-          projectDb.chat_last_reads.create({
+          projectDb.chatLastRead.create({
             data: {
-              chat_id: chat.chat_chatid,
-              user_id: memberId,
-              last_read_at: null,
+              chatId: chat.id,
+              userId: memberId,
+              lastReadAt: null,
             },
           }),
         ),
@@ -95,8 +95,8 @@ export class ChatService {
     limit: number = 50,
     before?: string,
   ) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -104,15 +104,15 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Verify user has access to this chat
-    const chatAccess = await projectDb.chat_last_reads.findUnique({
+    const chatAccess = await projectDb.chatLastRead.findUnique({
       where: {
-        chat_id_user_id: {
-          chat_id: chatId,
-          user_id: userId,
+        chatId_userId: {
+          chatId: chatId,
+          userId: userId,
         },
       },
     });
@@ -123,65 +123,65 @@ export class ChatService {
 
     // Build query
     const whereClause: any = {
-      chm_chatid: chatId,
+      chatId: chatId,
     };
 
     if (before) {
-      whereClause.chm_created_at = {
+      whereClause.createdAt = {
         lt: new Date(before),
       };
     }
 
-    const messages = await projectDb.chatmessages.findMany({
+    const messages = await projectDb.chatMessage.findMany({
       where: whereClause,
       orderBy: {
-        chm_created_at: 'desc',
+        createdAt: 'desc',
       },
       take: limit,
     });
 
     // Get user info from global database for all messages
-    const userIds = [...new Set(messages.map((m) => m.chm_userid))];
-    const users = await this.prisma.users.findMany({
+    const userIds = [...new Set(messages.map((m) => m.userId))];
+    const users = await this.prisma.user.findMany({
       where: {
-        user_userid: { in: userIds as string[] },
+        id: { in: userIds as string[] },
       },
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
+        id: true,
+        name: true,
+        email: true,
       },
     });
 
-    const userMap = new Map(users.map((u) => [u.user_userid, u]));
+    const userMap = new Map(users.map((u) => [u.id, u]));
 
     // Get file references for messages
-    const messageIds = messages.map((m) => m.chm_messageid);
-    const fileRefs = await projectDb.filereferences.findMany({
+    const messageIds = messages.map((m) => m.id);
+    const fileRefs = await projectDb.fileReference.findMany({
       where: {
-        fr_referencetypeid: 2, // 2 = chat message reference
-        fr_referenceid: { in: messageIds },
+        referenceTypeId: 2, // 2 = chat message reference
+        referenceId: { in: messageIds },
       },
       include: {
-        files: true,
+        file: true,
       },
     });
 
     const filesByMessageId = new Map<string, any[]>();
     fileRefs.forEach((ref) => {
-      if (!filesByMessageId.has(ref.fr_referenceid)) {
-        filesByMessageId.set(ref.fr_referenceid, []);
+      if (!filesByMessageId.has(ref.referenceId)) {
+        filesByMessageId.set(ref.referenceId, []);
       }
-      if (ref.files) {
-        filesByMessageId.get(ref.fr_referenceid)!.push(ref.files);
+      if (ref.file) {
+        filesByMessageId.get(ref.referenceId)!.push(ref.file);
       }
     });
 
     // Combine data
     const enrichedMessages: ChatMessage[] = messages.map((msg) => ({
       ...msg,
-      user: userMap.get(msg.chm_userid),
-      files: filesByMessageId.get(msg.chm_messageid) || [],
+      user: userMap.get(msg.userId),
+      files: filesByMessageId.get(msg.id) || [],
     }));
 
     return enrichedMessages.reverse(); // Return oldest to newest
@@ -192,8 +192,8 @@ export class ChatService {
     userId: string,
     sendMessageDto: SendMessageDto,
   ) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -201,15 +201,15 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Verify user has access to this chat
-    const chatAccess = await projectDb.chat_last_reads.findUnique({
+    const chatAccess = await projectDb.chatLastRead.findUnique({
       where: {
-        chat_id_user_id: {
-          chat_id: sendMessageDto.chatId,
-          user_id: userId,
+        chatId_userId: {
+          chatId: sendMessageDto.chatId,
+          userId: userId,
         },
       },
     });
@@ -219,11 +219,11 @@ export class ChatService {
     }
 
     // Create message
-    const message = await projectDb.chatmessages.create({
+    const message = await projectDb.chatMessage.create({
       data: {
-        chm_chatid: sendMessageDto.chatId,
-        chm_userid: userId,
-        chm_message: sendMessageDto.message,
+        chatId: sendMessageDto.chatId,
+        userId: userId,
+        message: sendMessageDto.message,
       },
     });
 
@@ -231,11 +231,11 @@ export class ChatService {
     if (sendMessageDto.fileIds && sendMessageDto.fileIds.length > 0) {
       await Promise.all(
         sendMessageDto.fileIds.map((fileId) =>
-          projectDb.filereferences.create({
+          projectDb.fileReference.create({
             data: {
-              fr_fileid: fileId,
-              fr_referencetypeid: 2, // 2 = chat message reference
-              fr_referenceid: message.chm_messageid,
+              fileId: fileId,
+              referenceTypeId: 2, // 2 = chat message reference
+              referenceId: message.id,
             },
           }),
         ),
@@ -243,26 +243,26 @@ export class ChatService {
     }
 
     // Update user's last_read to this message
-    await projectDb.chat_last_reads.update({
+    await projectDb.chatLastRead.update({
       where: {
-        chat_id_user_id: {
-          chat_id: sendMessageDto.chatId,
-          user_id: userId,
+        chatId_userId: {
+          chatId: sendMessageDto.chatId,
+          userId: userId,
         },
       },
       data: {
-        last_read_messageid: message.chm_messageid,
-        last_read_at: new Date(),
+        lastReadMsgId: message.id,
+        lastReadAt: new Date(),
       },
     });
 
     // Get user info
-    const user = await this.prisma.users.findUnique({
-      where: { user_userid: userId },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
+        id: true,
+        name: true,
+        email: true,
       },
     });
 
@@ -278,8 +278,8 @@ export class ChatService {
     userId: string,
     updateMessageDto: UpdateMessageDto,
   ) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -287,27 +287,27 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Get message and verify ownership
-    const message = await projectDb.chatmessages.findUnique({
-      where: { chm_messageid: messageId },
+    const message = await projectDb.chatMessage.findUnique({
+      where: { id: messageId },
     });
 
     if (!message) {
       throw new NotFoundException(`Message with ID ${messageId} not found`);
     }
 
-    if (message.chm_userid !== userId) {
+    if (message.userId !== userId) {
       throw new ForbiddenException('You can only edit your own messages');
     }
 
     // Update message
-    const updatedMessage = await projectDb.chatmessages.update({
-      where: { chm_messageid: messageId },
+    const updatedMessage = await projectDb.chatMessage.update({
+      where: { id: messageId },
       data: {
-        chm_message: updateMessageDto.message,
+        message: updateMessageDto.message,
       },
     });
 
@@ -315,8 +315,8 @@ export class ChatService {
   }
 
   async deleteMessage(projectId: string, messageId: string, userId: string) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -324,25 +324,25 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Get message and verify ownership
-    const message = await projectDb.chatmessages.findUnique({
-      where: { chm_messageid: messageId },
+    const message = await projectDb.chatMessage.findUnique({
+      where: { id: messageId },
     });
 
     if (!message) {
       throw new NotFoundException(`Message with ID ${messageId} not found`);
     }
 
-    if (message.chm_userid !== userId) {
+    if (message.userId !== userId) {
       throw new ForbiddenException('You can only delete your own messages');
     }
 
     // Delete message (cascade will delete file references)
-    await projectDb.chatmessages.delete({
-      where: { chm_messageid: messageId },
+    await projectDb.chatMessage.delete({
+      where: { id: messageId },
     });
 
     return { success: true };
@@ -354,8 +354,8 @@ export class ChatService {
     messageId: string,
     userId: string,
   ) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -363,15 +363,15 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Verify user has access to this chat
-    const chatAccess = await projectDb.chat_last_reads.findUnique({
+    const chatAccess = await projectDb.chatLastRead.findUnique({
       where: {
-        chat_id_user_id: {
-          chat_id: chatId,
-          user_id: userId,
+        chatId_userId: {
+          chatId: chatId,
+          userId: userId,
         },
       },
     });
@@ -381,25 +381,25 @@ export class ChatService {
     }
 
     // Verify message exists and belongs to this chat
-    const message = await projectDb.chatmessages.findUnique({
-      where: { chm_messageid: messageId },
+    const message = await projectDb.chatMessage.findUnique({
+      where: { id: messageId },
     });
 
-    if (!message || message.chm_chatid !== chatId) {
+    if (!message || message.chatId !== chatId) {
       throw new BadRequestException('Invalid message or chat');
     }
 
     // Update last_read
-    await projectDb.chat_last_reads.update({
+    await projectDb.chatLastRead.update({
       where: {
-        chat_id_user_id: {
-          chat_id: chatId,
-          user_id: userId,
+        chatId_userId: {
+          chatId: chatId,
+          userId: userId,
         },
       },
       data: {
-        last_read_messageid: messageId,
-        last_read_at: new Date(),
+        lastReadMsgId: messageId,
+        lastReadAt: new Date(),
       },
     });
 
@@ -407,8 +407,8 @@ export class ChatService {
   }
 
   async getUserChats(projectId: string, userId: string) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -416,34 +416,31 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Get all chats user has access to
-    const userChats = await projectDb.chat_last_reads.findMany({
+    const userChats = await projectDb.chatLastRead.findMany({
       where: {
-        user_id: userId,
-      },
-      include: {
-        chatmessages: true,
+        userId: userId,
       },
     });
 
-    const chatIds = userChats.map((uc) => uc.chat_id);
+    const chatIds = userChats.map((uc) => uc.chatId);
 
     // Get chat containers
-    const chats = await projectDb.chatcontainers.findMany({
+    const chats = await projectDb.chatContainer.findMany({
       where: {
-        chat_chatid: { in: chatIds },
+        id: { in: chatIds },
       },
     });
 
     // Get last message for each chat
     const lastMessages = await Promise.all(
       chatIds.map((chatId) =>
-        projectDb.chatmessages.findFirst({
-          where: { chm_chatid: chatId },
-          orderBy: { chm_created_at: 'desc' },
+        projectDb.chatMessage.findFirst({
+          where: { chatId: chatId },
+          orderBy: { createdAt: 'desc' },
         }),
       ),
     );
@@ -451,45 +448,45 @@ export class ChatService {
     const lastMessageMap = new Map(
       lastMessages
         .filter((msg) => msg !== null)
-        .map((msg) => [msg!.chm_chatid, msg]),
+        .map((msg) => [msg!.chatId, msg]),
     );
 
     // Calculate unread count for each chat
     const enrichedChats: ChatContainer[] = await Promise.all(
       chats.map(async (chat) => {
         const userChatAccess = userChats.find(
-          (uc) => uc.chat_id === chat.chat_chatid,
+          (uc) => uc.chatId === chat.id,
         );
-        const lastReadMessageId = userChatAccess?.last_read_messageid;
+        const lastReadMessageId = userChatAccess?.lastReadMsgId;
 
         let unreadCount = 0;
         if (lastReadMessageId) {
-          const lastReadMessage = await projectDb.chatmessages.findUnique({
-            where: { chm_messageid: lastReadMessageId },
+          const lastReadMessage = await projectDb.chatMessage.findUnique({
+            where: { id: lastReadMessageId },
           });
 
-          if (lastReadMessage && lastReadMessage.chm_created_at) {
-            unreadCount = await projectDb.chatmessages.count({
+          if (lastReadMessage && lastReadMessage.createdAt) {
+            unreadCount = await projectDb.chatMessage.count({
               where: {
-                chm_chatid: chat.chat_chatid,
-                chm_created_at: {
-                  gt: lastReadMessage.chm_created_at,
+                chatId: chat.id,
+                createdAt: {
+                  gt: lastReadMessage.createdAt,
                 },
               },
             });
           }
         } else {
           // No messages read yet, count all messages
-          unreadCount = await projectDb.chatmessages.count({
+          unreadCount = await projectDb.chatMessage.count({
             where: {
-              chm_chatid: chat.chat_chatid,
+              chatId: chat.id,
             },
           });
         }
 
         return {
           ...chat,
-          lastMessage: lastMessageMap.get(chat.chat_chatid),
+          lastMessage: lastMessageMap.get(chat.id),
           unreadCount,
         };
       }),
@@ -504,8 +501,8 @@ export class ChatService {
     fileName: string,
     fileUrl: string,
   ) {
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -513,15 +510,15 @@ export class ChatService {
     }
 
     const projectDb = await this.projectDatabaseService.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Create file record
-    const file = await projectDb.files.create({
+    const file = await projectDb.file.create({
       data: {
-        fil_name: fileName,
-        fil_url: fileUrl,
-        fil_uploaded_by: userId,
+        name: fileName,
+        url: fileUrl,
+        uploadedBy: userId,
       },
     });
 

@@ -1,5 +1,4 @@
 import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
-import type { users } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -55,8 +54,8 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
-  async googleCallback(@CurrentUser() user: users, @Res() res: Response) {
-    const response = await this.authService.login(user.user_userid);
+  async googleCallback(@CurrentUser() user: User, @Res() res: Response) {
+    const response = await this.authService.login(user.id);
     const redirectUri = this.configService.getOrThrow<string>(
       'GOOGLE_AUTH_REDIRECT',
     );

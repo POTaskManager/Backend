@@ -12,12 +12,12 @@ export class BoardsService {
 
   async create(projectId: string, dto: CreateBoardDto) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -25,38 +25,38 @@ export class BoardsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Get max order to append new column
-    const maxOrder = await projectClient.columns.findFirst({
-      orderBy: { col_order: 'desc' },
-      select: { col_order: true },
+    const maxOrder = await projectClient.column.findFirst({
+      orderBy: { order: 'desc' },
+      select: { order: true },
     });
 
     // Create column in project database
-    return projectClient.columns.create({
+    return projectClient.column.create({
       data: {
-        col_name: dto.name,
-        col_order: (maxOrder?.col_order ?? -1) + 1,
+        name: dto.name,
+        order: (maxOrder?.order ?? -1) + 1,
       },
       select: {
-        col_columnid: true,
-        col_name: true,
-        col_order: true,
-        col_created_at: true,
+        id: true,
+        name: true,
+        order: true,
+        createdAt: true,
       },
     });
   }
 
   async findAll(projectId: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -64,29 +64,29 @@ export class BoardsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch columns from project database
-    return projectClient.columns.findMany({
-      orderBy: { col_order: 'asc' },
+    return projectClient.column.findMany({
+      orderBy: { order: 'asc' },
       select: {
-        col_columnid: true,
-        col_name: true,
-        col_order: true,
-        col_created_at: true,
+        id: true,
+        name: true,
+        order: true,
+        createdAt: true,
       },
     });
   }
 
   async findOne(projectId: string, id: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -94,17 +94,17 @@ export class BoardsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch column from project database
-    const column = await projectClient.columns.findUnique({
-      where: { col_columnid: id },
+    const column = await projectClient.column.findUnique({
+      where: { id },
       select: {
-        col_columnid: true,
-        col_name: true,
-        col_order: true,
-        col_created_at: true,
+        id: true,
+        name: true,
+        order: true,
+        createdAt: true,
       },
     });
 

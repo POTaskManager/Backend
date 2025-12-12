@@ -12,12 +12,12 @@ export class TasksService {
 
   async create(dto: CreateTaskDto) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: dto.projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${dto.projectId} not found or has no database`,
       );
@@ -25,45 +25,45 @@ export class TasksService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Create task in project database
-    return projectClient.tasks.create({
+    return projectClient.task.create({
       data: {
-        task_sprintid: dto.sprintId,
-        task_created_by: dto.createdBy,
-        task_title: dto.title,
-        task_description: dto.description,
-        task_statusid: dto.state,
-        task_priority: dto.priority === 'low' ? 1 : dto.priority === 'medium' ? 2 : dto.priority === 'high' ? 3 : 4,
-        task_due_at: dto.dueDate,
-        task_assigned_to: dto.assignedTo,
+        sprintId: dto.sprintId,
+        createdBy: dto.createdBy,
+        title: dto.title,
+        description: dto.description,
+        statusId: dto.state,
+        priority: dto.priority === 'low' ? 1 : dto.priority === 'medium' ? 2 : dto.priority === 'high' ? 3 : 4,
+        dueAt: dto.dueDate,
+        assignedTo: dto.assignedTo,
       },
       select: {
-        task_taskid: true,
-        task_sprintid: true,
-        task_created_by: true,
-        task_title: true,
-        task_description: true,
-        task_statusid: true,
-        task_priority: true,
-        task_due_at: true,
-        task_assigned_to: true,
-        task_created_at: true,
-        task_updated_at: true,
+        id: true,
+        sprintId: true,
+        createdBy: true,
+        title: true,
+        description: true,
+        statusId: true,
+        priority: true,
+        dueAt: true,
+        assignedTo: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
   async findAll(projectId: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -71,35 +71,35 @@ export class TasksService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch tasks from project database
-    return projectClient.tasks.findMany({
+    return projectClient.task.findMany({
       select: {
-        task_taskid: true,
-        task_sprintid: true,
-        task_created_by: true,
-        task_title: true,
-        task_description: true,
-        task_statusid: true,
-        task_priority: true,
-        task_due_at: true,
-        task_assigned_to: true,
-        task_created_at: true,
-        task_updated_at: true,
+        id: true,
+        sprintId: true,
+        createdBy: true,
+        title: true,
+        description: true,
+        statusId: true,
+        priority: true,
+        dueAt: true,
+        assignedTo: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
   async findOne(projectId: string, id: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -107,24 +107,24 @@ export class TasksService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch task from project database
-    const task = await projectClient.tasks.findUnique({
-      where: { task_taskid: id },
+    const task = await projectClient.task.findUnique({
+      where: { id },
       select: {
-        task_taskid: true,
-        task_sprintid: true,
-        task_created_by: true,
-        task_title: true,
-        task_description: true,
-        task_statusid: true,
-        task_priority: true,
-        task_due_at: true,
-        task_assigned_to: true,
-        task_created_at: true,
-        task_updated_at: true,
+        id: true,
+        sprintId: true,
+        createdBy: true,
+        title: true,
+        description: true,
+        statusId: true,
+        priority: true,
+        dueAt: true,
+        assignedTo: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 

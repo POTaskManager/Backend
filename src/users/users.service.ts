@@ -10,58 +10,58 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const passwordHash = this.hashPassword(dto.password);
 
-    return this.prisma.users.create({
+    return this.prisma.user.create({
       data: {
-        user_name: dto.firstName + ' ' + dto.lastName,
-        user_email: dto.email,
-        user_password_hash: dto.password,
+        name: dto.firstName + ' ' + dto.lastName,
+        email: dto.email,
+        passwordHash: dto.password,
       },
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
-        is_active: true,
-        user_created_at: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
       },
     });
   }
 
   findAll() {
-    return this.prisma.users.findMany({
+    return this.prisma.user.findMany({
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
-        is_active: true,
-        user_created_at: true,
-        last_login: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        lastLogin: true,
       },
     });
   }
 
   findOne(id: string) {
-    return this.prisma.users.findUnique({
-      where: { user_userid: id },
+    return this.prisma.user.findUnique({
+      where: { id },
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
-        is_active: true,
-        user_created_at: true,
-        last_login: true,
-        user_password_hash: true,
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        lastLogin: true,
+        passwordHash: true,
       },
     });
   }
 
   findByEmail(email: string) {
-    return this.prisma.users.findUnique({
-      where: { user_email: email },
+    return this.prisma.user.findUnique({
+      where: { email },
       select: {
-        user_userid: true,
-        user_name: true,
-        user_email: true,
-        user_password_hash: true,
+        id: true,
+        name: true,
+        email: true,
+        passwordHash: true,
       },
     });
   }
@@ -71,42 +71,42 @@ export class UsersService {
   }
 
   async createOrUpdateSession(userId: string, hashedRefreshToken: string) {
-    const existingSession = await this.prisma.sessions.findFirst({
-      where: { user_id: userId, revoked: false },
+    const existingSession = await this.prisma.session.findFirst({
+      where: { userId, revoked: false },
     });
 
     if (existingSession) {
-      return this.prisma.sessions.update({
-        where: { session_id: existingSession.session_id },
+      return this.prisma.session.update({
+        where: { id: existingSession.id },
         data: {
-          refresh_token_hash: hashedRefreshToken,
-          last_seen_at: new Date(),
+          refreshTokenHash: hashedRefreshToken,
+          lastSeenAt: new Date(),
         },
       });
     }
 
-    return this.prisma.sessions.create({
+    return this.prisma.session.create({
       data: {
-        user_id: userId,
-        refresh_token_hash: hashedRefreshToken,
-        last_seen_at: new Date(),
+        userId,
+        refreshTokenHash: hashedRefreshToken,
+        lastSeenAt: new Date(),
       },
     });
   }
 
   async getUserSession(userId: string) {
-    return this.prisma.sessions.findFirst({
-      where: { user_id: userId, revoked: false },
+    return this.prisma.session.findFirst({
+      where: { userId, revoked: false },
       select: {
-        session_id: true,
-        refresh_token_hash: true,
+        id: true,
+        refreshTokenHash: true,
       },
     });
   }
 
   async revokeSession(userId: string) {
-    return this.prisma.sessions.updateMany({
-      where: { user_id: userId, revoked: false },
+    return this.prisma.session.updateMany({
+      where: { userId, revoked: false },
       data: { revoked: true },
     });
   }

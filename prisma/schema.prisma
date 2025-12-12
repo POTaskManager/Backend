@@ -7,137 +7,154 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model projectaccess {
-  pac_accessid   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pac_userid     String    @db.Uuid
-  pac_projectid  String    @db.Uuid
-  pac_role       String?   @db.VarChar(50)
-  pac_invited_at DateTime? @db.Timestamp(6)
-  pac_accepted   Boolean?  @default(false)
-  pac_created_at DateTime? @default(now()) @db.Timestamp(6)
-  pac_role_id    String?   @db.Uuid
-  updated_at     DateTime? @db.Timestamp(6)
-  projects       projects  @relation(fields: [pac_projectid], references: [proj_projid], onDelete: Cascade, onUpdate: NoAction)
-  roles          roles?    @relation(fields: [pac_role_id], references: [role_roleid], onUpdate: NoAction)
-  users          users     @relation(fields: [pac_userid], references: [user_userid], onDelete: Cascade, onUpdate: NoAction)
+model ProjectAccess {
+  accessId   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("pac_accessid")
+  userId     String    @db.Uuid @map("pac_userid")
+  projectId  String    @db.Uuid @map("pac_projectid")
+  role       String?   @db.VarChar(50) @map("pac_role")
+  invitedAt  DateTime? @db.Timestamp(6) @map("pac_invited_at")
+  accepted   Boolean?  @default(false) @map("pac_accepted")
+  createdAt  DateTime? @default(now()) @db.Timestamp(6) @map("pac_created_at")
+  roleId     String?   @db.Uuid @map("pac_role_id")
+  updatedAt  DateTime? @db.Timestamp(6) @map("updated_at")
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roleRef    Role?     @relation(fields: [roleId], references: [id], onUpdate: NoAction)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([pac_projectid], map: "idx_projectaccess_project")
-  @@index([pac_userid], map: "idx_projectaccess_user")
+  @@index([projectId], map: "idx_projectaccess_project")
+  @@index([userId], map: "idx_projectaccess_user")
+  @@map("projectaccess")
 }
 
-model projects {
-  proj_projid         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  proj_name           String                @db.VarChar(255)
-  proj_db_namespace   String                @unique @db.VarChar(255)
-  proj_created_by     String?               @db.Uuid
-  proj_created_at     DateTime?             @default(now()) @db.Timestamp(6)
-  proj_description    String?
-  updated_at          DateTime?             @db.Timestamp(6)
-  projectaccess       projectaccess[]
-  projectaccess_audit projectaccess_audit[]
-  users               users?                @relation(fields: [proj_created_by], references: [user_userid], onUpdate: NoAction)
+model Project {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("proj_projid")
+  name             String               @db.VarChar(255) @map("proj_name")
+  dbNamespace      String               @unique @db.VarChar(255) @map("proj_db_namespace")
+  createdBy        String?              @db.Uuid @map("proj_created_by")
+  createdAt        DateTime?            @default(now()) @db.Timestamp(6) @map("proj_created_at")
+  description      String?              @map("proj_description")
+  updatedAt        DateTime?            @db.Timestamp(6) @map("updated_at")
+  projectAccess    ProjectAccess[]
+  accessAudits     ProjectAccessAudit[]
+  creator          User?                @relation(fields: [createdBy], references: [id], onUpdate: NoAction)
+
+  @@map("projects")
 }
 
-model roles {
-  role_roleid   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  role_name     String          @db.VarChar(100)
-  projectaccess projectaccess[]
+model Role {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("role_roleid")
+  name          String          @db.VarChar(100) @map("role_name")
+  projectAccess ProjectAccess[]
+
+  @@map("roles")
 }
 
-model sessions {
-  session_id              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                 String?                   @db.Uuid
-  refresh_token_hash      String?
-  expires_at              DateTime?                 @db.Timestamp(6)
-  last_seen_at            DateTime?                 @db.Timestamp(6)
-  revoked                 Boolean?                  @default(false)
-  user_agent              String?
-  ip_address              String?                   @db.Inet
-  created_at              DateTime?                 @default(now()) @db.Timestamp(6)
-  meta                    Json?
-  refresh_token_blacklist refresh_token_blacklist[]
-  users                   users?                    @relation(fields: [user_id], references: [user_userid], onDelete: Cascade, onUpdate: NoAction, map: "sessions_userid_fkey")
+model Session {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("session_id")
+  userId                String?                  @db.Uuid @map("user_id")
+  refreshTokenHash      String?                  @map("refresh_token_hash")
+  expiresAt             DateTime?                @db.Timestamp(6) @map("expires_at")
+  lastSeenAt            DateTime?                @db.Timestamp(6) @map("last_seen_at")
+  revoked               Boolean?                 @default(false)
+  userAgent             String?                  @map("user_agent")
+  ipAddress             String?                  @db.Inet @map("ip_address")
+  createdAt             DateTime?                @default(now()) @db.Timestamp(6) @map("created_at")
+  meta                  Json?
+  refreshTokenBlacklist RefreshTokenBlacklist[]
+  user                  User?                    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sessions_userid_fkey")
+
+  @@map("sessions")
 }
 
-model user_identities {
-  identity_id      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id          String?   @db.Uuid
-  provider         String    @db.VarChar(100)
-  provider_user_id String    @db.VarChar(255)
-  provider_email   String?   @db.Citext
-  created_at       DateTime? @default(now()) @db.Timestamp(6)
-  email_verified   Boolean?  @default(false)
-  display_name     String?   @db.VarChar(255)
-  avatar_url       String?
-  users            users?    @relation(fields: [user_id], references: [user_userid], onDelete: Cascade, onUpdate: NoAction)
+model UserIdentity {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("identity_id")
+  userId         String?   @db.Uuid @map("user_id")
+  provider       String    @db.VarChar(100)
+  providerUserId String    @db.VarChar(255) @map("provider_user_id")
+  providerEmail  String?   @db.Citext @map("provider_email")
+  createdAt      DateTime? @default(now()) @db.Timestamp(6) @map("created_at")
+  emailVerified  Boolean?  @default(false) @map("email_verified")
+  displayName    String?   @db.VarChar(255) @map("display_name")
+  avatarUrl      String?   @map("avatar_url")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([provider, provider_user_id], map: "user_identities_provider_userid_key")
+  @@unique([provider, providerUserId], map: "user_identities_provider_userid_key")
+  @@map("user_identities")
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-model users {
-  user_userid         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_email          String                @unique @db.Citext
-  user_password_hash  String                @db.VarChar(255)
-  user_name           String?               @db.VarChar(100)
-  user_created_at     DateTime?             @default(now()) @db.Timestamp(6)
-  user_email_verified Boolean?              @default(false)
-  last_login          DateTime?             @db.Timestamp(6)
-  is_active           Boolean?              @default(true)
-  updated_at          DateTime?             @db.Timestamp(6)
-  projectaccess       projectaccess[]
-  projectaccess_audit projectaccess_audit[]
-  projects            projects[]
-  sessions            sessions[]
-  user_audit          user_audit[]
-  user_identities     user_identities[]
-  usersettings        usersettings[]
+model User {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("user_userid")
+  email          String               @unique @db.Citext @map("user_email")
+  passwordHash   String               @db.VarChar(255) @map("user_password_hash")
+  name           String?              @db.VarChar(100) @map("user_name")
+  createdAt      DateTime?            @default(now()) @db.Timestamp(6) @map("user_created_at")
+  emailVerified  Boolean?             @default(false) @map("user_email_verified")
+  lastLogin      DateTime?            @db.Timestamp(6) @map("last_login")
+  isActive       Boolean?             @default(true) @map("is_active")
+  updatedAt      DateTime?            @db.Timestamp(6) @map("updated_at")
+  projectAccess  ProjectAccess[]
+  accessAudits   ProjectAccessAudit[]
+  projects       Project[]
+  sessions       Session[]
+  userAudits     UserAudit[]
+  identities     UserIdentity[]
+  settings       UserSettings[]
+
+  @@map("users")
 }
 
-model usersettings {
-  uset_settingsid            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  uset_userid                String?  @db.Uuid
-  uset_theme                 String?  @db.VarChar(50)
-  uset_language              String?  @db.VarChar(10)
-  uset_notifications_enabled Boolean? @default(true)
-  users                      users?   @relation(fields: [uset_userid], references: [user_userid], onDelete: Cascade, onUpdate: NoAction)
+model UserSettings {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("uset_settingsid")
+  userId               String?  @db.Uuid @map("uset_userid")
+  theme                String?  @db.VarChar(50) @map("uset_theme")
+  language             String?  @db.VarChar(10) @map("uset_language")
+  notificationsEnabled Boolean? @default(true) @map("uset_notifications_enabled")
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("usersettings")
 }
 
-model projectaccess_audit {
-  audit_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pac_accessid   String?   @db.Uuid
-  project_id     String?   @db.Uuid
-  user_id        String?   @db.Uuid
-  operation      String?   @db.VarChar(20)
-  changed_by     String?   @db.Uuid
-  changed_at     DateTime? @default(now()) @db.Timestamp(6)
-  changed_fields Json?
-  old            Json?
-  new            Json?
-  projects       projects? @relation(fields: [project_id], references: [proj_projid], onUpdate: NoAction)
-  users          users?    @relation(fields: [user_id], references: [user_userid], onUpdate: NoAction)
+model ProjectAccessAudit {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("audit_id")
+  accessId      String?   @db.Uuid @map("pac_accessid")
+  projectId     String?   @db.Uuid @map("project_id")
+  userId        String?   @db.Uuid @map("user_id")
+  operation     String?   @db.VarChar(20)
+  changedBy     String?   @db.Uuid @map("changed_by")
+  changedAt     DateTime? @default(now()) @db.Timestamp(6) @map("changed_at")
+  changedFields Json?     @map("changed_fields")
+  old           Json?
+  new           Json?
+  project       Project?  @relation(fields: [projectId], references: [id], onUpdate: NoAction)
+  user          User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
-  @@index([project_id], map: "idx_pac_audit_project")
-  @@index([user_id], map: "idx_pac_audit_user")
+  @@index([projectId], map: "idx_pac_audit_project")
+  @@index([userId], map: "idx_pac_audit_user")
+  @@map("projectaccess_audit")
 }
 
-model refresh_token_blacklist {
-  token_hash     String    @id
-  session_id     String?   @db.Uuid
-  blacklisted_at DateTime? @default(now()) @db.Timestamp(6)
-  expires_at     DateTime? @db.Timestamp(6)
-  reason         String?
-  sessions       sessions? @relation(fields: [session_id], references: [session_id], onDelete: Cascade, onUpdate: NoAction)
+model RefreshTokenBlacklist {
+  tokenHash     String    @id @map("token_hash")
+  sessionId     String?   @db.Uuid @map("session_id")
+  blacklistedAt DateTime? @default(now()) @db.Timestamp(6) @map("blacklisted_at")
+  expiresAt     DateTime? @db.Timestamp(6) @map("expires_at")
+  reason        String?
+  session       Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("refresh_token_blacklist")
 }
 
-model user_audit {
-  audit_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id        String?   @db.Uuid
-  operation      String?   @db.VarChar(20)
-  changed_by     String?   @db.Uuid
-  changed_at     DateTime? @default(now()) @db.Timestamp(6)
-  changed_fields Json?
-  old            Json?
-  new            Json?
-  users          users?    @relation(fields: [user_id], references: [user_userid], onUpdate: NoAction)
+model UserAudit {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("audit_id")
+  userId        String?   @db.Uuid @map("user_id")
+  operation     String?   @db.VarChar(20)
+  changedBy     String?   @db.Uuid @map("changed_by")
+  changedAt     DateTime? @default(now()) @db.Timestamp(6) @map("changed_at")
+  changedFields Json?     @map("changed_fields")
+  old           Json?
+  new           Json?
+  user          User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@map("user_audit")
 }

@@ -12,12 +12,12 @@ export class SprintsService {
 
   async create(projectId: string, dto: CreateSprintDto) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -25,34 +25,34 @@ export class SprintsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Create sprint in project database
-    return projectClient.sprints.create({
+    return projectClient.sprint.create({
       data: {
-        spr_name: dto.name,
-        spr_start_date: dto.startDate ? new Date(dto.startDate) : undefined,
-        spr_end_date: dto.endDate ? new Date(dto.endDate) : undefined,
+        name: dto.name,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
       },
       select: {
-        spr_sprintid: true,
-        spr_name: true,
-        spr_start_date: true,
-        spr_end_date: true,
-        spr_statusid: true,
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        statusId: true,
       },
     });
   }
 
   async findAll(projectId: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -60,29 +60,29 @@ export class SprintsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch sprints from project database
-    return projectClient.sprints.findMany({
+    return projectClient.sprint.findMany({
       select: {
-        spr_sprintid: true,
-        spr_name: true,
-        spr_start_date: true,
-        spr_end_date: true,
-        spr_statusid: true,
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        statusId: true,
       },
     });
   }
 
   async findOne(projectId: string, id: string) {
     // Get project to find namespace
-    const project = await this.prisma.projects.findUnique({
-      where: { proj_projid: projectId },
-      select: { proj_db_namespace: true },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { dbNamespace: true },
     });
 
-    if (!project || !project.proj_db_namespace) {
+    if (!project || !project.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
@@ -90,18 +90,18 @@ export class SprintsService {
 
     // Get project-specific client
     const projectClient = await this.projectDb.getProjectClient(
-      project.proj_db_namespace,
+      project.dbNamespace,
     );
 
     // Fetch sprint from project database
-    const sprint = await projectClient.sprints.findUnique({
-      where: { spr_sprintid: id },
+    const sprint = await projectClient.sprint.findUnique({
+      where: { id },
       select: {
-        spr_sprintid: true,
-        spr_name: true,
-        spr_start_date: true,
-        spr_end_date: true,
-        spr_statusid: true,
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        statusId: true,
       },
     });
 

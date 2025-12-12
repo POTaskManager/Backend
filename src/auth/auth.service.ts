@@ -20,11 +20,11 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = await compare(password, user.user_password_hash);
+    const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
 
-    return { id: user.user_userid };
+    return { id: user.id };
   }
 
   async login(userId: string) {
@@ -65,11 +65,11 @@ export class AuthService {
 
   async validateRefreshToken(userId: string, refreshToken: string) {
     const session = await this.userService.getUserSession(userId);
-    if (!session || !session.refresh_token_hash)
+    if (!session || !session.refreshTokenHash)
       throw new UnauthorizedException('Invalid Refresh Token');
 
     const refreshTokenMatches = await argon2.verify(
-      session.refresh_token_hash,
+      session.refreshTokenHash,
       refreshToken,
     );
     if (!refreshTokenMatches)
@@ -85,7 +85,7 @@ export class AuthService {
   async validateJwtUser(userId: string) {
     const user = await this.userService.findOne(userId);
     if (!user) throw new UnauthorizedException('User not found!');
-    const currentUser: CurrentUser = { id: user.user_userid };
+    const currentUser: CurrentUser = { id: user.id };
     return currentUser;
   }
 
@@ -98,9 +98,9 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = await argon2.verify(user.user_password_hash, password);
+    const isPasswordMatch = await argon2.verify(user.passwordHash, password);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
-    return { id: user.user_userid, email: user.user_email };
+    return { id: user.id, email: user.email };
   }
 }

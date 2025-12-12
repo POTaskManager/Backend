@@ -19,7 +19,7 @@ export class ProjectsService {
     let counter = 1;
     
     // Ensure namespace is unique
-    while (await this.prisma.projects.findFirst({ where: { proj_db_namespace: namespace } })) {
+    while (await this.prisma.project.findFirst({ where: { dbNamespace: namespace } })) {
       namespace = `${baseNamespace}_${counter}`;
       counter++;
     }
@@ -49,29 +49,29 @@ export class ProjectsService {
     // Step 4: Create project record and add members in transaction
     const project = await this.prisma.$transaction(async (tx) => {
       // Create project
-      const newProject = await tx.projects.create({
+      const newProject = await tx.project.create({
         data: {
-          proj_name: dto.name,
-          proj_db_namespace: namespace,
-          proj_created_by: dto.ownerId,
-          proj_description: dto.description,
+          name: dto.name,
+          dbNamespace: namespace,
+          createdBy: dto.ownerId,
+          description: dto.description,
         },
         select: {
-          proj_projid: true,
-          proj_name: true,
-          proj_db_namespace: true,
-          proj_created_by: true,
-          proj_created_at: true,
+          id: true,
+          name: true,
+          dbNamespace: true,
+          createdBy: true,
+          createdAt: true,
         },
       });
 
       // Add owner as admin (assuming role with ID exists or use default)
-      await tx.projectaccess.create({
+      await tx.projectAccess.create({
         data: {
-          pac_projectid: newProject.proj_projid,
-          pac_userid: dto.ownerId,
-          pac_role: 'owner',
-          pac_accepted: true,
+          projectId: newProject.id,
+          userId: dto.ownerId,
+          role: 'owner',
+          accepted: true,
         },
       });
 
@@ -80,14 +80,14 @@ export class ProjectsService {
         const memberData = dto.memberIds
           .filter(id => id !== dto.ownerId) // Don't duplicate owner
           .map(userId => ({
-            pac_projectid: newProject.proj_projid,
-            pac_userid: userId,
-            pac_role: 'member',
-            pac_accepted: true,
+            projectId: newProject.id,
+            userId,
+            role: 'member',
+            accepted: true,
           }));
 
         if (memberData.length > 0) {
-          await tx.projectaccess.createMany({
+          await tx.projectAccess.createMany({
             data: memberData,
           });
         }
@@ -96,113 +96,113 @@ export class ProjectsService {
       return newProject;
     });
 
-    this.logger.log(`Project ${project.proj_projid} created with ${(dto.memberIds?.length || 0) + 1} members`);
+    this.logger.log(`Project ${project.id} created with ${(dto.memberIds?.length || 0) + 1} members`);
     return project;
   }
 
   findAll() {
-    return this.prisma.projects.findMany({
+    return this.prisma.project.findMany({
       select: {
-        proj_projid: true,
-        proj_name: true,
-        proj_db_namespace: true,
-        proj_created_by: true,
-        proj_created_at: true,
+        id: true,
+        name: true,
+        dbNamespace: true,
+        createdBy: true,
+        createdAt: true,
       },
     });
   }
 
   findForUser(userId: string) {
-    return this.prisma.projects.findMany({
+    return this.prisma.project.findMany({
       where: {
         OR: [
-          { proj_created_by: userId },
+          { createdBy: userId },
           {
-            projectaccess: {
+            projectAccess: {
               some: {
-                pac_userid: userId,
+                userId,
               },
             },
           },
         ],
       },
       select: {
-        proj_projid: true,
-        proj_name: true,
-        proj_db_namespace: true,
-        proj_created_by: true,
-        proj_created_at: true,
+        id: true,
+        name: true,
+        dbNamespace: true,
+        createdBy: true,
+        createdAt: true,
       },
     });
   }
 
   findOne(id: string) {
-    return this.prisma.projects.findUnique({
-      where: { proj_projid: id },
+    return this.prisma.project.findUnique({
+      where: { id },
       select: {
-        proj_projid: true,
-        proj_name: true,
-        proj_db_namespace: true,
-        proj_created_by: true,
-        proj_created_at: true,
+        id: true,
+        name: true,
+        dbNamespace: true,
+        createdBy: true,
+        createdAt: true,
       },
     });
   }
 
   async update(id: string, dto: UpdateProjectDto) {
-    return this.prisma.projects.update({
-      where: { proj_projid: id },
+    return this.prisma.project.update({
+      where: { id },
       data: {
-        proj_name: dto.name,
+        name: dto.name,
       },
       select: {
-        proj_projid: true,
-        proj_name: true,
-        proj_db_namespace: true,
-        proj_created_by: true,
-        proj_created_at: true,
+        id: true,
+        name: true,
+        dbNamespace: true,
+        createdBy: true,
+        createdAt: true,
       },
     });
   }
 
   async delete(id: string) {
-    return this.prisma.projects.delete({
-      where: { proj_projid: id },
-      select: { proj_projid: true },
+    return this.prisma.project.delete({
+      where: { id },
+      select: { id: true },
     });
   }
 
   async addMember(projectId: string, dto: AddMemberDto) {
-    return this.prisma.projectaccess.create({
+    return this.prisma.projectAccess.create({
       data: {
-        pac_projectid: projectId,
-        pac_userid: dto.userId,
-        pac_role: 'member',
-        pac_role_id: dto.roleId,
+        projectId,
+        userId: dto.userId,
+        role: 'member',
+        roleId: dto.roleId,
       },
       select: {
-        pac_accessid: true,
-        pac_projectid: true,
-        pac_userid: true,
-        pac_role: true,
+        accessId: true,
+        projectId: true,
+        userId: true,
+        role: true,
       },
     });
   }
 
   async removeMember(projectId: string, userId: string) {
-    const existing = await this.prisma.projectaccess.findFirst({
+    const existing = await this.prisma.projectAccess.findFirst({
       where: {
-        pac_projectid: projectId,
-        pac_userid: userId,
+        projectId,
+        userId,
       },
-      select: { pac_accessid: true },
+      select: { accessId: true },
     });
     if (!existing) {
       throw new NotFoundException('Member not found in project');
     }
-    return this.prisma.projectaccess.delete({
-      where: { pac_accessid: existing.pac_accessid },
-      select: { pac_accessid: true },
+    return this.prisma.projectAccess.delete({
+      where: { accessId: existing.accessId },
+      select: { accessId: true },
     });
   }
 }

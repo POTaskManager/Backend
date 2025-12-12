@@ -8,7 +8,7 @@ export class ProjectDatabaseService implements OnModuleDestroy {
 
   /**
    * Get Prisma client for specific project database
-   * @param namespace - Project database namespace (from proj_db_namespace)
+   * @param namespace - Project database namespace (from dbNamespace)
    * @returns PrismaClient connected to project_{namespace} database
    */
   async getProjectClient(namespace: string): Promise<PrismaClient> {
