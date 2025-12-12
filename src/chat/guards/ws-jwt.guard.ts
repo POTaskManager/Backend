@@ -37,14 +37,23 @@ export class WsJwtGuard implements CanActivate {
   }
 
   private extractTokenFromHandshake(client: Socket): string | undefined {
-    // Try to get token from auth header
+    // Extract token from cookies (primary method - matches REST API auth)
+    const cookies = client.handshake.headers.cookie;
+    if (cookies) {
+      const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
+      if (accessTokenMatch) {
+        return accessTokenMatch[1];
+      }
+    }
+
+    // Fallback: Try to get token from auth header (for non-browser clients)
     const authHeader = client.handshake.headers.authorization;
     if (authHeader) {
       const [type, token] = authHeader.split(' ');
       return type === 'Bearer' ? token : undefined;
     }
 
-    // Try to get token from query params (for browser connections)
+    // Fallback: Try to get token from query params
     const token = client.handshake.auth?.token || client.handshake.query?.token;
     return token as string | undefined;
   }

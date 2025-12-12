@@ -5,7 +5,6 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { Prisma } from '@prisma/client';
 import { execSync } from 'child_process';
-import * as path from 'path';
 
 @Injectable()
 export class ProjectsService {
@@ -33,8 +32,6 @@ export class ProjectsService {
       await this.prisma.$executeRawUnsafe(`CREATE DATABASE ${dbName}`);
       
       // Step 2: Load schema from projectdb.sql template using docker exec psql
-      const sqlPath = path.join(__dirname, '../../../Database/db/projectdb.sql');
-      
       // Use docker exec to run psql inside the database container
       // This avoids needing psql installed on the host
       execSync(
