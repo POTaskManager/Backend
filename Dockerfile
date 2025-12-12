@@ -11,14 +11,14 @@ COPY package.json package-lock.json* ./
 # Install dependencies first
 RUN npm install
 
-# Copy prisma schemas
+# Copy prisma schemas and config
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
-# Set dummy DATABASE_URL for prisma generate (not used, just required by config)
-ARG DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
-ENV DATABASE_URL=${DATABASE_URL}
+# Set dummy DATABASE_URL for prisma generate (not used, just required)
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
-# Generate Prisma clients
+# Generate both Prisma clients
 RUN npx prisma generate --schema=prisma/schema.prisma && \
     npx prisma generate --schema=prisma/project-schema.prisma
 
@@ -26,7 +26,8 @@ RUN npx prisma generate --schema=prisma/schema.prisma && \
 COPY src ./src
 COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 
-# Build application (keep DATABASE_URL for build script)
+# Build application (keep dummy DATABASE_URL for prisma:generate in build script)
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 RUN npm run build
 
 # Stage 2: Production
@@ -40,12 +41,14 @@ COPY package.json package-lock.json* ./
 # Install production dependencies only
 RUN npm install --production
 
-# Copy prisma schemas for runtime
-COPY prisma ./prisma
+# Copy Prisma clients from builder (already generated)
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/@prisma-project ./node_modules/@prisma-project
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Generate Prisma clients in production image
-RUN npx prisma generate --schema=prisma/schema.prisma && \
-    npx prisma generate --schema=prisma/project-schema.prisma
+# Copy prisma schemas and config (needed for migrations)
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist

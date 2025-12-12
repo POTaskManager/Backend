@@ -18,8 +18,14 @@ export class ProjectDatabaseService implements OnModuleDestroy {
     }
 
     // Create new connection (lazy loading)
-    const dbName = `project_${namespace}`;
-    const dbUrl = process.env.DATABASE_URL!.replace('/globaldb', `/${dbName}`);
+    const dbHost = process.env.DB_HOST || 'localhost';
+    const dbPort = process.env.DB_PORT || '5432';
+    const dbUser = process.env.DB_USER || 'postgres';
+    const dbPassword = process.env.DB_PASSWORD || 'changeme';
+    const dbPrefix = process.env.DB_PROJECT_PREFIX || 'project_';
+    
+    const dbName = `${dbPrefix}${namespace}`;
+    const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?schema=public`;
     
     this.logger.log(`Creating new connection to project database: ${dbName}`);
     
