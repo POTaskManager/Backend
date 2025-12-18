@@ -1,15 +1,18 @@
 # Dev-oriented image: live reload with Nest CLI and Prisma client pre-generated.
 FROM node:20-bullseye
 
+# Install Docker CLI for docker exec commands
+RUN apt-get update && apt-get install -y docker.io && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install deps first to leverage Docker layer cache.
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy Prisma schema and generate client.
+# Copy Prisma schemas and generate both clients (globaldb + project).
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN npm run prisma:generate
 
 # Copy the rest of the source.
 COPY . .

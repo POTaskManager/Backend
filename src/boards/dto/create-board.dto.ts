@@ -1,9 +1,6 @@
-import { IsIn, IsString, IsUUID, Length } from 'class-validator';
+import { IsIn, IsString, Length } from 'class-validator';
 
 export class CreateBoardDto {
-  @IsUUID()
-  projectId!: string;
-
   @IsString()
   @Length(1, 120)
   name!: string;

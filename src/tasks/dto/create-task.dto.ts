@@ -22,12 +22,6 @@ export enum TaskState {
 }
 
 export class CreateTaskDto {
-  @IsUUID()
-  projectId!: string;
-
-  @IsUUID()
-  boardId!: string;
-
   @IsOptional()
   @IsUUID()
   sprintId?: string;
@@ -35,9 +29,6 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   assignedTo?: string;
-
-  @IsUUID()
-  createdBy!: string;
 
   @IsString()
   @Length(1, 200)
@@ -47,8 +38,8 @@ export class CreateTaskDto {
   @IsString()
   description?: string;
 
-  @IsEnum(TaskState)
-  state!: TaskState;
+  @IsUUID('4')
+  state!: string;
 
   @IsEnum(TaskPriority)
   priority!: TaskPriority;
