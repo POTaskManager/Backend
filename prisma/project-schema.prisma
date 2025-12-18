@@ -223,6 +223,7 @@ model Task {
   dueAt        DateTime?         @db.Timestamptz(6) @map("task_due_at")
   assignedTo   String?           @db.Uuid @map("task_assigned_to")
   estimate     Int?              @map("task_estimate")
+  archived     Boolean           @default(false) @map("task_archived")
   comments     Comment[]
   audits       TaskAudit[]
   contributors TaskContributor[]

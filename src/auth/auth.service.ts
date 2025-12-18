@@ -1,9 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { compare } from 'bcrypt';
+import { compare, hash } from 'bcrypt';
 
 import { ConfigService } from '@nestjs/config';
-import * as argon2 from 'argon2';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UsersService } from 'src/users/users.service';
 import { AuthJwtPayload } from './dto/auth-jwt-payload';
@@ -29,7 +28,7 @@ export class AuthService {
 
   async login(userId: string) {
     const { accessToken, refreshToken } = await this.generateTokens(userId);
-    const hashedRefreshToken = await argon2.hash(refreshToken);
+    const hashedRefreshToken = await hash(refreshToken, 10);
     await this.userService.createOrUpdateSession(userId, hashedRefreshToken);
     return {
       id: userId,
@@ -54,7 +53,7 @@ export class AuthService {
 
   async refreshToken(userId: string) {
     const { accessToken, refreshToken } = await this.generateTokens(userId);
-    const hashedRefreshToken = await argon2.hash(refreshToken);
+    const hashedRefreshToken = await hash(refreshToken, 10);
     await this.userService.createOrUpdateSession(userId, hashedRefreshToken);
     return {
       id: userId,
@@ -68,9 +67,9 @@ export class AuthService {
     if (!session || !session.refreshTokenHash)
       throw new UnauthorizedException('Invalid Refresh Token');
 
-    const refreshTokenMatches = await argon2.verify(
-      session.refreshTokenHash,
+    const refreshTokenMatches = await compare(
       refreshToken,
+      session.refreshTokenHash,
     );
     if (!refreshTokenMatches)
       throw new UnauthorizedException('Invalid Refresh Token');
@@ -98,7 +97,7 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
-    const isPasswordMatch = await argon2.verify(user.passwordHash, password);
+    const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
     return { id: user.id, email: user.email };

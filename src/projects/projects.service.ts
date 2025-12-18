@@ -1,18 +1,23 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectDatabaseService } from '../project-database/project-database.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { Prisma } from '@prisma/client';
-import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectDb: ProjectDatabaseService,
+  ) {}
 
-  async create(dto: CreateProjectDto) {
+  async create(dto: CreateProjectDto, ownerId: string) {
     // Generate unique namespace from project name
     const baseNamespace = dto.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     let namespace = baseNamespace;
@@ -31,19 +36,110 @@ export class ProjectsService {
       this.logger.log(`Creating project database: ${dbName}`);
       await this.prisma.$executeRawUnsafe(`CREATE DATABASE ${dbName}`);
       
-      // Step 2: Load schema from projectdb.sql template using docker exec psql
-      // Use docker exec to run psql inside the database container
-      // This avoids needing psql installed on the host
-      execSync(
-        `docker exec potask_db psql -U postgres -d ${dbName} -f /docker-entrypoint-initdb.d/projectdb.sql -q`,
-        { stdio: 'pipe' }
-      );
+      // Step 2: Create temporary connection to new database (NOT via ProjectDatabaseService)
+      // ProjectDatabaseService caches connections, but we need fresh connection for schema init
+      const dbHost = process.env.DB_HOST || 'db';
+      const dbPort = process.env.DB_PORT || '5432';
+      const dbUser = process.env.DB_USER || 'postgres';
+      const dbPassword = process.env.DB_PASSWORD || 'changeme';
+      const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?schema=public`;
+      
+      const { PrismaClient: ProjectPrismaClient } = await import('@prisma-project/client');
+      const tempClient = new ProjectPrismaClient({
+        datasources: { db: { url: dbUrl } }
+      });
+      
+      await tempClient.$connect();
+      this.logger.log(`Connected to new project database: ${dbName}`);
+      
+      // Step 3: Load schema from projectdb.sql
+      const schemaPath = join(__dirname, '../../prisma/projectdb.sql');
+      const schemaSql = readFileSync(schemaPath, 'utf8');
+      
+      // Remove comments and split SQL into individual statements
+      const statements = schemaSql
+        .split('\n')
+        .filter(line => {
+          const trimmed = line.trim();
+          return trimmed.length > 0 && !trimmed.startsWith('--');
+        })
+        .join('\n')
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      this.logger.log(`Executing ${statements.length} schema statements`);
+      
+      // Execute schema statements
+      for (let i = 0; i < statements.length; i++) {
+        try {
+          await tempClient.$executeRawUnsafe(statements[i]);
+        } catch (err) {
+          this.logger.error(`Failed to execute statement ${i+1}/${statements.length}: ${err.message}`);
+          this.logger.debug(`Statement: ${statements[i].substring(0, 100)}...`);
+          throw err;
+        }
+      }
+      
+      // Reconnect to refresh schema metadata cache
+      await tempClient.$disconnect();
+      await tempClient.$connect();
+      this.logger.log(`Schema loaded, reconnected to refresh metadata`);
+      
+      // Step 4: Load seed data from seed-project-data.sql
+      this.logger.log(`Seeding basic data for ${dbName}`);
+      const seedPath = join(__dirname, '../../prisma/seed-project-data.sql');
+      const seedSql = readFileSync(seedPath, 'utf8');
+      
+      const seedStatements = seedSql
+        .split('\n')
+        .filter(line => {
+          const trimmed = line.trim();
+          return trimmed.length > 0 && !trimmed.startsWith('--');
+        })
+        .join('\n')
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      this.logger.log(`Executing ${seedStatements.length} seed statements`);
+      
+      for (const statement of seedStatements) {
+        await tempClient.$executeRawUnsafe(statement);
+      }
+      
+      await tempClient.$disconnect();
       
       this.logger.log(`Project database ${dbName} created successfully`);
       
     } catch (error) {
       this.logger.error(`Failed to create project database: ${error.message}`);
       throw new Error(`Failed to create project database: ${error.message}`);
+    }
+
+    // Step 3: Resolve member emails to user IDs
+    let memberIds: string[] = [];
+    if (dto.memberEmails && dto.memberEmails.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          email: {
+            in: dto.memberEmails,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+        },
+      });
+      
+      memberIds = users.map(u => u.id);
+      
+      // Log if some emails were not found
+      const foundEmails = users.map(u => u.email);
+      const notFoundEmails = dto.memberEmails.filter(email => !foundEmails.includes(email));
+      if (notFoundEmails.length > 0) {
+        this.logger.warn(`Some member emails not found: ${notFoundEmails.join(', ')}`);
+      }
     }
 
     // Step 4: Create project record and add members in transaction
@@ -53,7 +149,7 @@ export class ProjectsService {
         data: {
           name: dto.name,
           dbNamespace: namespace,
-          createdBy: dto.ownerId,
+          createdBy: ownerId,
           description: dto.description,
         },
         select: {
@@ -69,16 +165,16 @@ export class ProjectsService {
       await tx.projectAccess.create({
         data: {
           projectId: newProject.id,
-          userId: dto.ownerId,
+          userId: ownerId,
           role: 'owner',
           accepted: true,
         },
       });
 
       // Add initial members if provided
-      if (dto.memberIds && dto.memberIds.length > 0) {
-        const memberData = dto.memberIds
-          .filter(id => id !== dto.ownerId) // Don't duplicate owner
+      if (memberIds.length > 0) {
+        const memberData = memberIds
+          .filter(id => id !== ownerId) // Don't duplicate owner
           .map(userId => ({
             projectId: newProject.id,
             userId,
@@ -96,7 +192,7 @@ export class ProjectsService {
       return newProject;
     });
 
-    this.logger.log(`Project ${project.id} created with ${(dto.memberIds?.length || 0) + 1} members`);
+    this.logger.log(`Project ${project.id} created with ${memberIds.length + 1} members`);
     return project;
   }
 

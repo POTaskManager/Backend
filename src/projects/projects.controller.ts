@@ -10,6 +10,8 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '../auth/dto/user.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -26,8 +28,8 @@ export class ProjectsController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateProjectDto) {
-    return this.projectsService.create(dto);
+  create(@Body() dto: CreateProjectDto, @CurrentUser() user: User) {
+    return this.projectsService.create(dto, user.id);
   }
 
   @Get()

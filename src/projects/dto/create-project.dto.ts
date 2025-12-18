@@ -1,9 +1,8 @@
 import {
   IsArray,
-  IsDateString,
+  IsEmail,
   IsOptional,
   IsString,
-  IsUUID,
   Length,
 } from 'class-validator';
 
@@ -16,11 +15,8 @@ export class CreateProjectDto {
   @IsString()
   description?: string;
 
-  @IsUUID()
-  ownerId!: string;
-
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
-  memberIds?: string[];
+  @IsEmail({}, { each: true })
+  memberEmails?: string[];
 }
