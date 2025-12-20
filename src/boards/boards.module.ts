@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
-import { ProjectDatabaseModule } from '../project-database/project-database.module';
 import { BoardsController } from './boards.controller';
 import { BoardsService } from './boards.service';
+import { DrizzleModule } from '../drizzle/drizzle.module';
 
 @Module({
-  imports: [PrismaModule, ProjectDatabaseModule],
+  imports: [DrizzleModule],
   controllers: [BoardsController],
   providers: [BoardsService],
   exports: [BoardsService],

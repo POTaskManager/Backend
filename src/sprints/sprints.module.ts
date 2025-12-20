@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
-import { ProjectDatabaseModule } from '../project-database/project-database.module';
-import { SprintsController } from './sprints.controller';
 import { SprintsService } from './sprints.service';
+import { SprintsController } from './sprints.controller';
+import { DrizzleModule } from '../drizzle/drizzle.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [PrismaModule, ProjectDatabaseModule],
+  imports: [DrizzleModule, UsersModule],
   controllers: [SprintsController],
   providers: [SprintsService],
   exports: [SprintsService],

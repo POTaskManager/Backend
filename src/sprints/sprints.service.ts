@@ -3,135 +3,137 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProjectDatabaseService } from '../project-database/project-database.service';
+import { DrizzleService } from '../drizzle/drizzle.service';
+import { UsersService } from '../users/users.service';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
+import { eq, inArray, and, ne, isNull } from 'drizzle-orm';
+import * as globalSchema from '../drizzle/schemas/global.schema';
+import * as projectSchema from '../drizzle/schemas/project.schema';
 
 @Injectable()
 export class SprintsService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly projectDb: ProjectDatabaseService,
+    private readonly drizzle: DrizzleService,
+    private readonly users: UsersService,
   ) {}
 
   async create(projectId: string, dto: CreateSprintDto, userId: string) {
     // Get project to find namespace
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    // Get project-specific client
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
     // Find status by name
-    const status = await projectClient.status.findFirst({
-      where: {
-        name: dto.state,
-        typeId: 1, // Sprint status
-      },
-    });
+    const status = await projectClient
+      .select()
+      .from(projectSchema.statuses)
+      .where(
+        and(
+          eq(projectSchema.statuses.name, dto.state),
+          eq(projectSchema.statuses.typeId, 1) // Sprint status
+        )
+      );
 
-    if (!status) {
+    if (!status || status.length === 0) {
       throw new BadRequestException(
         `Sprint status "${dto.state}" not found`,
       );
     }
 
     // Create sprint in project database
-    return projectClient.sprint.create({
-      data: {
+    const result = await projectClient
+      .insert(projectSchema.sprints)
+      .values({
         name: dto.name,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        statusId: status.id,
-      },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-      },
-    });
+        statusId: status[0].id,
+      })
+      .returning({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      });
+
+    return result[0];
   }
 
   async findAll(projectId: string) {
     // Get project to find namespace
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    // Get project-specific client
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
     // Fetch sprints from project database
-    return projectClient.sprint.findMany({
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-      },
-    });
+    return projectClient
+      .select({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      })
+      .from(projectSchema.sprints);
   }
 
   async findOne(projectId: string, id: string) {
     // Get project to find namespace
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    // Get project-specific client
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
     // Fetch sprint from project database
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-      },
-    });
+    const sprint = await projectClient
+      .select({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      })
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, id));
 
-    if (!sprint) {
+    if (!sprint || sprint.length === 0) {
       throw new NotFoundException(
         `Sprint ${id} not found in project ${projectId}`,
       );
     }
 
-    return sprint;
+    return sprint[0];
   }
 
   async update(
@@ -140,272 +142,266 @@ export class SprintsService {
     dto: UpdateSprintDto,
     userId: string,
   ) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id },
-    });
+    const sprint = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, id));
 
-    if (!sprint) {
+    if (!sprint || sprint.length === 0) {
       throw new NotFoundException(
         `Sprint ${id} not found in project ${projectId}`,
       );
     }
 
-    return projectClient.sprint.update({
-      where: { id },
-      data: {
+    const result = await projectClient
+      .update(projectSchema.sprints)
+      .set({
         name: dto.name,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-      },
-    });
+      })
+      .where(eq(projectSchema.sprints.id, id))
+      .returning({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      });
+
+    return result[0];
   }
 
   async startSprint(projectId: string, sprintId: string, userId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
     // Check if sprint exists
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id: sprintId },
-      include: { status: true },
-    });
+    const sprint = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.sprints.statusId, projectSchema.statuses.id));
 
-    if (!sprint) {
+    if (!sprint || sprint.length === 0) {
       throw new NotFoundException(
         `Sprint ${sprintId} not found in project ${projectId}`,
       );
     }
 
-    // Check if there's already an active sprint
-    const activeSprint = await projectClient.sprint.findFirst({
-      where: {
-        status: {
-          name: 'Active',
-        },
-      },
-    });
+    // Check if there's already an active sprint (find by 'Active' status name, typeId 1)
+    const activeSprints = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .leftJoin(projectSchema.statuses, eq(projectSchema.sprints.statusId, projectSchema.statuses.id))
+      .where(and(
+        ne(projectSchema.sprints.id, sprintId),
+        eq(projectSchema.statuses.name, 'Active'),
+        eq(projectSchema.statuses.typeId, 1)
+      ));
 
-    if (activeSprint && activeSprint.id !== sprintId) {
+    if (activeSprints && activeSprints.length > 0) {
       throw new BadRequestException(
         'There is already an active sprint. Complete it before starting a new one.',
       );
     }
 
-    // Find "Active" status
-    const activeStatus = await projectClient.status.findFirst({
-      where: { name: 'Active', typeId: 2 }, // 2 = In Progress
-    });
+    // Find "Active" status (typeId 1 = Sprint Status)
+    const activeStatus = await projectClient
+      .select()
+      .from(projectSchema.statuses)
+      .where(
+        and(
+          eq(projectSchema.statuses.name, 'Active'),
+          eq(projectSchema.statuses.typeId, 1)
+        )
+      );
 
-    if (!activeStatus) {
+    if (!activeStatus || activeStatus.length === 0) {
       throw new NotFoundException('Active status not found for sprints');
     }
 
     // Update sprint status to Active
-    return projectClient.sprint.update({
-      where: { id: sprintId },
-      data: {
-        statusId: activeStatus.id,
+    const result = await projectClient
+      .update(projectSchema.sprints)
+      .set({ statusId: activeStatus[0].id })
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .returning({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      });
+
+    return {
+      ...result[0],
+      status: {
+        id: activeStatus[0].id,
+        name: activeStatus[0].name,
       },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-        status: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+    };
   }
 
   async completeSprint(projectId: string, sprintId: string, userId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id: sprintId },
-      include: {
-        status: true,
-        tasks: {
-          include: {
-            status: {
-              include: {
-                column: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const sprint = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId));
 
-    if (!sprint) {
+    if (!sprint || sprint.length === 0) {
       throw new NotFoundException(
         `Sprint ${sprintId} not found in project ${projectId}`,
       );
     }
 
-    // Find "Completed" status for sprint
-    const completedStatus = await projectClient.status.findFirst({
-      where: { name: 'Completed', typeId: 1 }, // 1 = Sprint Status
-    });
+    // Find "Completed" status for sprint (typeId 1 = Sprint Status)
+    const completedStatus = await projectClient
+      .select()
+      .from(projectSchema.statuses)
+      .where(
+        and(
+          eq(projectSchema.statuses.name, 'Completed'),
+          eq(projectSchema.statuses.typeId, 1)
+        )
+      );
 
-    if (!completedStatus) {
+    if (!completedStatus || completedStatus.length === 0) {
       throw new NotFoundException('Completed status not found for sprints');
     }
 
-    // Move incomplete tasks to backlog (remove sprintId)
-    const incompleteTasks = sprint.tasks.filter(
-      (task) => task.status && task.status.column && task.status.column.name !== 'Done',
-    );
+    // Get all sprint tasks with their status/column info
+    const sprintTasks = await projectClient
+      .select()
+      .from(projectSchema.tasks)
+      .where(eq(projectSchema.tasks.sprintId, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.tasks.statusId, projectSchema.statuses.id))
+      .leftJoin(projectSchema.columns, eq(projectSchema.statuses.columnId, projectSchema.columns.id));
+
+    // Move incomplete tasks to backlog (remove sprintId if not in Done column)
+    const incompleteTasks = sprintTasks
+      .filter((t) => t.columns?.name !== 'Done')
+      .map((t) => t.tasks.id);
 
     if (incompleteTasks.length > 0) {
-      await projectClient.task.updateMany({
-        where: {
-          id: {
-            in: incompleteTasks.map((t) => t.id),
-          },
-        },
-        data: {
-          sprintId: null,
-        },
-      });
+      await projectClient
+        .update(projectSchema.tasks)
+        .set({ sprintId: null })
+        .where(inArray(projectSchema.tasks.id, incompleteTasks));
     }
 
     // Update sprint status to Completed
-    return projectClient.sprint.update({
-      where: { id: sprintId },
-      data: {
-        statusId: completedStatus.id,
+    const result = await projectClient
+      .update(projectSchema.sprints)
+      .set({ statusId: completedStatus[0].id })
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .returning({
+        id: projectSchema.sprints.id,
+        name: projectSchema.sprints.name,
+        startDate: projectSchema.sprints.startDate,
+        endDate: projectSchema.sprints.endDate,
+        statusId: projectSchema.sprints.statusId,
+      });
+
+    return {
+      ...result[0],
+      status: {
+        id: completedStatus[0].id,
+        name: completedStatus[0].name,
       },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        statusId: true,
-        status: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        _count: {
-          select: {
-            tasks: true,
-          },
-        },
-      },
-    });
+    };
   }
 
   async getSprintStatistics(projectId: string, sprintId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id: sprintId },
-      include: {
-        status: true,
-        tasks: {
-          include: {
-            status: {
-              include: {
-                column: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const sprintData = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.sprints.statusId, projectSchema.statuses.id));
 
-    if (!sprint) {
+    if (!sprintData || sprintData.length === 0) {
       throw new NotFoundException(
         `Sprint ${sprintId} not found in project ${projectId}`,
       );
     }
 
-    const totalTasks = sprint.tasks.length;
-    const completedTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'Done',
-    ).length;
-    const inProgressTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'In Progress',
-    ).length;
-    const todoTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'To Do',
-    ).length;
+    const sprint = sprintData[0];
+
+    // Get all tasks for this sprint with their status/column info
+    const sprintTasks = await projectClient
+      .select()
+      .from(projectSchema.tasks)
+      .where(eq(projectSchema.tasks.sprintId, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.tasks.statusId, projectSchema.statuses.id))
+      .leftJoin(projectSchema.columns, eq(projectSchema.statuses.columnId, projectSchema.columns.id));
+
+    const totalTasks = sprintTasks.length;
+    const completedTasks = sprintTasks.filter((t) => t.columns?.name === 'Done').length;
+    const inProgressTasks = sprintTasks.filter((t) => t.columns?.name === 'In Progress').length;
+    const todoTasks = sprintTasks.filter((t) => t.columns?.name === 'To Do').length;
 
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 1000) / 10 : 0;
 
     return {
-      sprint_id: sprint.id,
-      sprint_name: sprint.name,
-      status: sprint.status?.name || 'Unknown',
-      start_date: sprint.startDate,
-      end_date: sprint.endDate,
+      sprint_id: sprint.sprints.id,
+      sprint_name: sprint.sprints.name,
+      status: sprint.statuses?.name || 'Unknown',
+      start_date: sprint.sprints.startDate,
+      end_date: sprint.sprints.endDate,
       statistics: {
         total_tasks: totalTasks,
         completed_tasks: completedTasks,
@@ -417,148 +413,134 @@ export class SprintsService {
   }
 
   async getSprintView(projectId: string, sprintId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { dbNamespace: true },
-    });
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
 
-    if (!project || !project.dbNamespace) {
+    if (!project || !project[0]?.dbNamespace) {
       throw new NotFoundException(
         `Project ${projectId} not found or has no database`,
       );
     }
 
-    const projectClient = await this.projectDb.getProjectClient(
-      project.dbNamespace,
-    );
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
-    const sprint = await projectClient.sprint.findUnique({
-      where: { id: sprintId },
-      include: {
-        status: true,
-        tasks: {
-          include: {
-            status: {
-              include: {
-                column: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const sprintData = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.sprints.statusId, projectSchema.statuses.id));
 
-    if (!sprint) {
+    if (!sprintData || sprintData.length === 0) {
       throw new NotFoundException(
         `Sprint ${sprintId} not found in project ${projectId}`,
       );
     }
 
-    // Get board columns
-    const columns = await projectClient.column.findMany({
-      orderBy: { order: 'asc' },
-      include: {
-        statuses: {
-          include: {
-            tasks: {
-              where: {
-                sprintId: sprintId,
-              },
-              include: {
-                status: true,
-                labels: {
-                  include: {
-                    label: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const sprint = sprintData[0];
+
+    // Get all columns with their statuses
+    const allColumns = await projectClient
+      .select()
+      .from(projectSchema.columns)
+      .orderBy(projectSchema.columns.order);
+
+    // Get all tasks for this sprint with labels
+    const sprintTasks = await projectClient
+      .select()
+      .from(projectSchema.tasks)
+      .where(eq(projectSchema.tasks.sprintId, sprintId))
+      .leftJoin(projectSchema.statuses, eq(projectSchema.tasks.statusId, projectSchema.statuses.id))
+      .leftJoin(projectSchema.columns, eq(projectSchema.statuses.columnId, projectSchema.columns.id));
+
+    // Get task labels
+    const taskLabels = await projectClient
+      .select()
+      .from(projectSchema.taskLabels)
+      .leftJoin(projectSchema.labels, eq(projectSchema.taskLabels.labelId, projectSchema.labels.id));
 
     // Get user info for assigned tasks
     const assignedUserIds = [
       ...new Set(
-        columns
-          .flatMap((col) => col.statuses)
-          .flatMap((status) => status.tasks)
-          .map((task) => task.assignedTo)
+        sprintTasks
+          .map((t) => t.tasks.assignedTo)
           .filter((id) => id !== null),
       ),
     ];
 
-    const users = await this.prisma.user.findMany({
-      where: {
-        id: { in: assignedUserIds as string[] },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
+    const users = (await this.users.findAll().catch(() => [])) || [];
+    const userMap = new Map<string, any>(
+      users.map((u: any) => [u.id, u]) as [string, any][]
+    );
+
+    // Get status-task mapping
+    const statuses = await projectClient
+      .select()
+      .from(projectSchema.statuses)
+      .where(eq(projectSchema.statuses.typeId, 2)); // Task status type
+
+    // Build board with columns and tasks
+    const board = allColumns.map((col) => {
+      const columnStatuses = statuses.filter((s) => s.columnId === col.id);
+      const columnTasks = sprintTasks.filter((t) =>
+        columnStatuses.some((s) => s.id === t.tasks.statusId)
+      );
+
+      return {
+        column_id: col.id,
+        column_name: col.name,
+        column_order: col.order,
+        tasks: columnTasks.map((t) => {
+          const taskTaskLabels = taskLabels.filter((tl) => tl.tasklabels?.taskId === t.tasks.id);
+          
+          return {
+            task_id: t.tasks.id,
+            title: t.tasks.title,
+            description: t.tasks.description,
+            priority: t.tasks.priority,
+            due_at: t.tasks.dueAt,
+            estimate: t.tasks.estimate,
+            status_id: t.tasks.statusId,
+            status_name: t.statuses?.name || 'Unknown',
+            assigned_to: t.tasks.assignedTo
+              ? {
+                  user_id: t.tasks.assignedTo,
+                  name: userMap.get(t.tasks.assignedTo)?.['name'] || null,
+                  email: userMap.get(t.tasks.assignedTo)?.['email'] || null,
+                }
+              : null,
+            labels: taskTaskLabels
+              .filter((tl) => tl.labels !== null)
+              .map((tl) => ({
+                label_id: tl.labels!.id,
+                name: tl.labels!.name,
+                color: tl.labels!.color,
+              })),
+            created_at: t.tasks.createdAt,
+            updated_at: t.tasks.updatedAt,
+          };
+        }),
+      };
     });
 
-    const userMap = new Map(users.map((u) => [u.id, u]));
-
     // Calculate statistics
-    const totalTasks = sprint.tasks.length;
-    const completedTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'Done',
-    ).length;
-    const inProgressTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'In Progress',
-    ).length;
-    const todoTasks = sprint.tasks.filter(
-      (task) => task.status?.column?.name === 'To Do',
-    ).length;
+    const totalTasks = sprintTasks.length;
+    const completedTasks = sprintTasks.filter((t) => t.columns?.name === 'Done').length;
+    const inProgressTasks = sprintTasks.filter((t) => t.columns?.name === 'In Progress').length;
+    const todoTasks = sprintTasks.filter((t) => t.columns?.name === 'To Do').length;
 
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 1000) / 10 : 0;
 
-    // Format board data
-    const board = columns.map((col) => ({
-      column_id: col.id,
-      column_name: col.name,
-      column_order: col.order,
-      tasks: col.statuses
-        .flatMap((status) => status.tasks)
-        .map((task) => ({
-          task_id: task.id,
-          title: task.title,
-          description: task.description,
-          priority: task.priority,
-          due_at: task.dueAt,
-          estimate: task.estimate,
-          status_id: task.statusId,
-          status_name: task.status?.name || 'Unknown',
-          assigned_to: task.assignedTo
-            ? {
-                user_id: task.assignedTo,
-                name: userMap.get(task.assignedTo)?.name || null,
-                email: userMap.get(task.assignedTo)?.email || null,
-              }
-            : null,
-          labels: task.labels
-            .filter((tl) => tl.label !== null)
-            .map((tl) => ({
-              label_id: tl.label!.id,
-              name: tl.label!.name,
-              color: tl.label!.color,
-            })),
-          created_at: task.createdAt,
-          updated_at: task.updatedAt,
-        })),
-    }));
-
     return {
       sprint: {
-        sprint_id: sprint.id,
-        name: sprint.name,
-        status: sprint.status?.name || 'Unknown',
-        start_date: sprint.startDate,
-        end_date: sprint.endDate,
+        sprint_id: sprint.sprints.id,
+        name: sprint.sprints.name,
+        status: sprint.statuses?.name || 'Unknown',
+        start_date: sprint.sprints.startDate,
+        end_date: sprint.sprints.endDate,
         statistics: {
           total_tasks: totalTasks,
           completed_tasks: completedTasks,

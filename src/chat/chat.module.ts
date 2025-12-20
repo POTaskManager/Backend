@@ -4,14 +4,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
-import { ProjectDatabaseModule } from '../project-database/project-database.module';
-import { PrismaModule } from '../prisma/prisma.module';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
+import { UsersModule } from '../users/users.module';
+import { ProjectsModule } from '../projects/projects.module';
+import { DrizzleModule } from '../drizzle/drizzle.module';
 
 @Module({
   imports: [
-    ProjectDatabaseModule,
-    PrismaModule,
+    DrizzleModule,
+    UsersModule,
+    ProjectsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

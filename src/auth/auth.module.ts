@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { UsersModule } from 'src/users/users.module';
-import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -28,9 +27,6 @@ import { RefreshJwtStrategy } from './strategies/refresh.strategy';
   controllers: [AuthController],
   providers: [
     AuthService,
-    JwtStrategy,
-    PrismaService,
-    AuthService,
     LocalStrategy,
     JwtStrategy,
     RefreshJwtStrategy,
@@ -39,10 +35,6 @@ import { RefreshJwtStrategy } from './strategies/refresh.strategy';
       provide: APP_GUARD,
       useClass: JwtAuthGuard, //@UseGuards(JwtAuthGuard) applied on all API endppints
     },
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: RolesGuard,
-    // },
   ],
 })
 export class AuthModule {}
