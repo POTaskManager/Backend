@@ -1,5 +1,17 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { User } from '@prisma/client';
+
+// User type definition (no longer using Prisma)
+export type User = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name?: string | null;
+  createdAt?: Date | null;
+  emailVerified?: boolean;
+  lastLogin?: Date | null;
+  isActive?: boolean;
+  updatedAt?: Date | null;
+};
 
 // Safe user type without password hash (what gets attached to request by strategies)
 export type SafeUser = Omit<User, 'passwordHash'>;

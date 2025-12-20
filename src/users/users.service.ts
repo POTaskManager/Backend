@@ -1,113 +1,167 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { eq, and } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcrypt';
-import { PrismaService } from '../prisma/prisma.service';
+import { DrizzleService } from '../drizzle/drizzle.service';
+import * as globalSchema from '../drizzle/schemas/global.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(private drizzleService: DrizzleService) {}
+
+  private getDb(): NodePgDatabase<typeof globalSchema> {
+    return this.drizzleService.getGlobalDb();
+  }
 
   async create(dto: CreateUserDto) {
     const passwordHash = await this.hashPassword(dto.password);
+    const db = this.getDb();
 
-    return this.prisma.user.create({
-      data: {
-        name: dto.firstName + ' ' + dto.lastName,
+    const user = await db
+      .insert(globalSchema.users)
+      .values({
         email: dto.email,
-        passwordHash: passwordHash,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
+        passwordHash,
+        name: `${dto.firstName} ${dto.lastName}`,
         isActive: true,
-        createdAt: true,
-      },
-    });
+        emailVerified: false,
+      })
+      .returning({
+        id: globalSchema.users.id,
+        name: globalSchema.users.name,
+        email: globalSchema.users.email,
+        isActive: globalSchema.users.isActive,
+        createdAt: globalSchema.users.createdAt,
+      });
+
+    return user[0];
   }
 
-  findAll() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isActive: true,
-        createdAt: true,
-        lastLogin: true,
-      },
-    });
+  async findAll() {
+    const db = this.getDb();
+
+    return db
+      .select({
+        id: globalSchema.users.id,
+        name: globalSchema.users.name,
+        email: globalSchema.users.email,
+        isActive: globalSchema.users.isActive,
+        createdAt: globalSchema.users.createdAt,
+        lastLogin: globalSchema.users.lastLogin,
+      })
+      .from(globalSchema.users);
   }
 
-  findOne(id: string) {
-    return this.prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isActive: true,
-        createdAt: true,
-        lastLogin: true,
-        passwordHash: true,
-      },
-    });
+  async findOne(id: string) {
+    const db = this.getDb();
+
+    const result = await db
+      .select({
+        id: globalSchema.users.id,
+        name: globalSchema.users.name,
+        email: globalSchema.users.email,
+        isActive: globalSchema.users.isActive,
+        createdAt: globalSchema.users.createdAt,
+        lastLogin: globalSchema.users.lastLogin,
+        passwordHash: globalSchema.users.passwordHash,
+      })
+      .from(globalSchema.users)
+      .where(eq(globalSchema.users.id, id));
+
+    return result[0] || null;
   }
 
-  findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        passwordHash: true,
-      },
-    });
+  async findByEmail(email: string) {
+    const db = this.getDb();
+
+    const result = await db
+      .select({
+        id: globalSchema.users.id,
+        name: globalSchema.users.name,
+        email: globalSchema.users.email,
+        passwordHash: globalSchema.users.passwordHash,
+      })
+      .from(globalSchema.users)
+      .where(eq(globalSchema.users.email, email));
+
+    return result[0] || null;
+  }
+
+  async createOrUpdateSession(userId: string, hashedRefreshToken: string) {
+    const db = this.getDb();
+
+    const existing = await db
+      .select()
+      .from(globalSchema.sessions)
+      .where(
+        and(
+          eq(globalSchema.sessions.userId, userId),
+          eq(globalSchema.sessions.revoked, false)
+        )
+      );
+
+    if (existing.length > 0) {
+      await db
+        .update(globalSchema.sessions)
+        .set({
+          refreshTokenHash: hashedRefreshToken,
+          lastSeenAt: new Date(),
+        })
+        .where(eq(globalSchema.sessions.id, existing[0].id));
+
+      return existing[0];
+    }
+
+    const session = await db
+      .insert(globalSchema.sessions)
+      .values({
+        userId,
+        refreshTokenHash: hashedRefreshToken,
+        lastSeenAt: new Date(),
+        revoked: false,
+      })
+      .returning();
+
+    return session[0];
+  }
+
+  async getUserSession(userId: string) {
+    const db = this.getDb();
+
+    const result = await db
+      .select({
+        id: globalSchema.sessions.id,
+        refreshTokenHash: globalSchema.sessions.refreshTokenHash,
+      })
+      .from(globalSchema.sessions)
+      .where(
+        and(
+          eq(globalSchema.sessions.userId, userId),
+          eq(globalSchema.sessions.revoked, false)
+        )
+      );
+
+    return result[0] || null;
+  }
+
+  async revokeSession(userId: string) {
+    const db = this.getDb();
+
+    return db
+      .update(globalSchema.sessions)
+      .set({ revoked: true })
+      .where(
+        and(
+          eq(globalSchema.sessions.userId, userId),
+          eq(globalSchema.sessions.revoked, false)
+        )
+      );
   }
 
   private async hashPassword(raw: string) {
     return hash(raw, 10);
-  }
-
-  async createOrUpdateSession(userId: string, hashedRefreshToken: string) {
-    const existingSession = await this.prisma.session.findFirst({
-      where: { userId, revoked: false },
-    });
-
-    if (existingSession) {
-      return this.prisma.session.update({
-        where: { id: existingSession.id },
-        data: {
-          refreshTokenHash: hashedRefreshToken,
-          lastSeenAt: new Date(),
-        },
-      });
-    }
-
-    return this.prisma.session.create({
-      data: {
-        userId,
-        refreshTokenHash: hashedRefreshToken,
-        lastSeenAt: new Date(),
-      },
-    });
-  }
-
-  async getUserSession(userId: string) {
-    return this.prisma.session.findFirst({
-      where: { userId, revoked: false },
-      select: {
-        id: true,
-        refreshTokenHash: true,
-      },
-    });
-  }
-
-  async revokeSession(userId: string) {
-    return this.prisma.session.updateMany({
-      where: { userId, revoked: false },
-      data: { revoked: true },
-    });
   }
 }
