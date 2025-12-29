@@ -16,5 +16,5 @@ COPY . .
 # Expose Nest default port.
 EXPOSE 3000
 
-# Start in watch mode for development.
-CMD ["npm", "run", "start:dev"]
+# Start in watch mode for development - copy templates first
+CMD ["sh", "-c", "mkdir -p /app/dist/notifications/templates && cp -r /app/src/notifications/templates/* /app/dist/notifications/templates/ && npm run start:dev"]

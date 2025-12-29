@@ -1,0 +1,28 @@
+<div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
+  <p style="margin: 0 0 10px 0; font-size: 16px;">
+    A new sprint has started in <span class="project-name">{{projectName}}</span>
+  </p>
+  <h2 style="margin: 10px 0; color: #333; font-size: 20px;">🚀 {{sprintName}}</h2>
+</div>
+
+<div style="background-color: #f8f9fa; border-radius: 4px; padding: 20px; margin: 20px 0;">
+  <p style="margin: 0 0 10px 0; font-size: 15px; color: #555;">
+    <strong>Start Date:</strong> {{startDate}}
+  </p>
+  {{#if endDate}}
+  <p style="margin: 0 0 10px 0; font-size: 15px; color: #555;">
+    <strong>End Date:</strong> {{endDate}}
+  </p>
+  {{/if}}
+  <p style="margin: 0; font-size: 15px; color: #555;">
+    <strong>Tasks:</strong> {{taskCount}}
+  </p>
+</div>
+
+<p style="margin: 20px 0; font-size: 15px; color: #555;">
+  The sprint has officially started. Let's make it a success! 🎯
+</p>
+
+<a href="{{sprintUrl}}" class="button" style="background-color: #ff9800; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">
+  View Sprint
+</a>
