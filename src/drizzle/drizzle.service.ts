@@ -16,13 +16,16 @@ import * as globalSchema from './schemas/global.schema';
 @Injectable()
 export class DrizzleService implements OnModuleDestroy {
   private readonly logger = new Logger(DrizzleService.name);
-  
+
   // Global database connection
   private globalDb: NodePgDatabase<typeof globalSchema>;
   private globalPool: Pool;
 
   // Multi-tenant project database connections (cached)
-  private projectConnections = new Map<string, NodePgDatabase<typeof projectSchema>>();
+  private projectConnections = new Map<
+    string,
+    NodePgDatabase<typeof projectSchema>
+  >();
   private projectPools = new Map<string, Pool>();
 
   constructor(private configService: ConfigService) {}
@@ -35,7 +38,8 @@ export class DrizzleService implements OnModuleDestroy {
       const dbHost = this.configService.get<string>('DB_HOST') || 'db';
       const dbPort = this.configService.get<number>('DB_PORT') || 5432;
       const dbUser = this.configService.get<string>('DB_USER') || 'postgres';
-      const dbPassword = this.configService.get<string>('DB_PASSWORD') || 'changeme';
+      const dbPassword =
+        this.configService.get<string>('DB_PASSWORD') || 'changeme';
       const dbName = this.configService.get<string>('DB_NAME') || 'taskmanager';
 
       this.globalPool = new Pool({
@@ -53,18 +57,23 @@ export class DrizzleService implements OnModuleDestroy {
 
       // Error handler for idle clients (prevents app crash on backend errors)
       this.globalPool.on('error', (err, client) => {
-        this.logger.error('Unexpected error on idle client in global pool', err);
+        this.logger.error(
+          'Unexpected error on idle client in global pool',
+          err,
+        );
       });
 
       this.globalDb = drizzle(this.globalPool, { schema: globalSchema });
-      
+
       // Test connection
       await this.globalPool.query('SELECT NOW()');
       this.logger.log(`✓ Connected to global database: ${dbName}`);
-      
+
       return this.globalDb;
     } catch (error) {
-      this.logger.error(`Failed to initialize global database: ${error.message}`);
+      this.logger.error(
+        `Failed to initialize global database: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -74,7 +83,9 @@ export class DrizzleService implements OnModuleDestroy {
    */
   getGlobalDb(): NodePgDatabase<typeof globalSchema> {
     if (!this.globalDb) {
-      throw new Error('Global database not initialized. Call initializeGlobalDb() first.');
+      throw new Error(
+        'Global database not initialized. Call initializeGlobalDb() first.',
+      );
     }
     return this.globalDb;
   }
@@ -83,7 +94,7 @@ export class DrizzleService implements OnModuleDestroy {
    * Get or create project-specific database connection
    */
   async getProjectDb(
-    namespace: string
+    namespace: string,
   ): Promise<NodePgDatabase<typeof projectSchema>> {
     // Return cached connection if available
     if (this.projectConnections.has(namespace)) {
@@ -94,7 +105,8 @@ export class DrizzleService implements OnModuleDestroy {
       const dbHost = this.configService.get<string>('DB_HOST') || 'db';
       const dbPort = this.configService.get<number>('DB_PORT') || 5432;
       const dbUser = this.configService.get<string>('DB_USER') || 'postgres';
-      const dbPassword = this.configService.get<string>('DB_PASSWORD') || 'changeme';
+      const dbPassword =
+        this.configService.get<string>('DB_PASSWORD') || 'changeme';
       const dbName = `project_${namespace}`;
 
       const pool = new Pool({
@@ -112,7 +124,10 @@ export class DrizzleService implements OnModuleDestroy {
 
       // Error handler for idle clients
       pool.on('error', (err, client) => {
-        this.logger.error(`Unexpected error on idle client in project pool ${dbName}`, err);
+        this.logger.error(
+          `Unexpected error on idle client in project pool ${dbName}`,
+          err,
+        );
       });
 
       // Test connection
@@ -128,7 +143,7 @@ export class DrizzleService implements OnModuleDestroy {
       return db;
     } catch (error) {
       this.logger.error(
-        `Failed to connect to project database ${namespace}: ${error.message}`
+        `Failed to connect to project database ${namespace}: ${error.message}`,
       );
       throw error;
     }
@@ -139,34 +154,33 @@ export class DrizzleService implements OnModuleDestroy {
    */
   async createProjectDatabase(namespace: string): Promise<void> {
     const dbName = `project_${namespace}`;
-    
+
     try {
       this.logger.log(`Creating project database: ${dbName}`);
-      
+
       // Step 1: Create database using global connection
-      const adminPool = this.globalPool || await this.createAdminConnection();
+      const adminPool = this.globalPool || (await this.createAdminConnection());
       await adminPool.query(`CREATE DATABASE ${dbName}`);
       this.logger.log(`✓ Database created: ${dbName}`);
-      
+
       // Step 2: Connect to new database temporarily
       const tempDb = await this.createTempConnection(dbName);
-      
+
       // Step 3: Load schema from projectdb.sql
       this.logger.log(`Loading schema into ${dbName}`);
       await this.loadProjectSchema(tempDb, dbName);
-      
+
       // Close and reopen connection to ensure fresh state
       await tempDb.end();
       const seedDb = await this.createTempConnection(dbName);
-      
+
       // Step 4: Load seed data from seed-project-data.sql
       this.logger.log(`Seeding data for ${dbName}`);
       await this.seedProjectDatabase(seedDb, dbName);
-      
+
       // Close seed connection
       await seedDb.end();
       this.logger.log(`✓ Project database initialized successfully: ${dbName}`);
-      
     } catch (error) {
       this.logger.error(`Failed to create project database: ${error.message}`);
       // Try to clean up
@@ -186,7 +200,8 @@ export class DrizzleService implements OnModuleDestroy {
     const dbHost = this.configService.get<string>('DB_HOST') || 'db';
     const dbPort = this.configService.get<number>('DB_PORT') || 5432;
     const dbUser = this.configService.get<string>('DB_USER') || 'postgres';
-    const dbPassword = this.configService.get<string>('DB_PASSWORD') || 'changeme';
+    const dbPassword =
+      this.configService.get<string>('DB_PASSWORD') || 'changeme';
 
     const pool = new Pool({
       host: dbHost,
@@ -205,6 +220,10 @@ export class DrizzleService implements OnModuleDestroy {
       return pool;
     } catch (error) {
       await pool.end();
+      return pool;
+    }
+  }
+
   /**
    * Create admin connection to system database
    */
@@ -212,7 +231,8 @@ export class DrizzleService implements OnModuleDestroy {
     const dbHost = this.configService.get<string>('DB_HOST') || 'db';
     const dbPort = this.configService.get<number>('DB_PORT') || 5432;
     const dbUser = this.configService.get<string>('DB_USER') || 'postgres';
-    const dbPassword = this.configService.get<string>('DB_PASSWORD') || 'changeme';
+    const dbPassword =
+      this.configService.get<string>('DB_PASSWORD') || 'changeme';
 
     const pool = new Pool({
       host: dbHost,
@@ -222,10 +242,6 @@ export class DrizzleService implements OnModuleDestroy {
       // Admin connection - minimal pool
       max: 2,
       min: 0,
-      host: dbHost,
-      port: dbPort,
-      user: dbUser,
-      password: dbPassword,
       database: 'postgres',
     });
 
@@ -245,10 +261,12 @@ export class DrizzleService implements OnModuleDestroy {
     try {
       const schemaPath = join(__dirname, '../../database/db/projectdb.sql');
       const schemaSql = readFileSync(schemaPath, 'utf8');
-      
+
       const statements = this.parseSqlStatements(schemaSql);
-      this.logger.log(`Executing ${statements.length} schema statements for ${dbName}`);
-      
+      this.logger.log(
+        `Executing ${statements.length} schema statements for ${dbName}`,
+      );
+
       let successCount = 0;
       for (let i = 0; i < statements.length; i++) {
         try {
@@ -257,19 +275,28 @@ export class DrizzleService implements OnModuleDestroy {
         } catch (err) {
           const errMsg = err.message || '';
           // Only skip "already exists" type errors
-          if (errMsg.includes('already exists') || errMsg.includes('duplicate')) {
-            this.logger.debug(`Skipped (already exists): ${statements[i].substring(0, 50)}...`);
+          if (
+            errMsg.includes('already exists') ||
+            errMsg.includes('duplicate')
+          ) {
+            this.logger.debug(
+              `Skipped (already exists): ${statements[i].substring(0, 50)}...`,
+            );
             successCount++;
           } else {
             this.logger.error(
-              `Failed to execute statement ${i + 1}/${statements.length}: ${errMsg}`
+              `Failed to execute statement ${i + 1}/${statements.length}: ${errMsg}`,
             );
-            this.logger.error(`Full statement: ${statements[i].substring(0, 200)}...`);
+            this.logger.error(
+              `Full statement: ${statements[i].substring(0, 200)}...`,
+            );
             throw err;
           }
         }
       }
-      this.logger.log(`✓ Schema loaded: ${successCount}/${statements.length} statements`);
+      this.logger.log(
+        `✓ Schema loaded: ${successCount}/${statements.length} statements`,
+      );
     } catch (error) {
       throw new Error(`Failed to load schema: ${error.message}`);
     }
@@ -282,36 +309,50 @@ export class DrizzleService implements OnModuleDestroy {
     try {
       // Verify schema is loaded by checking for a key table
       try {
-        await pool.query(`SELECT 1 FROM statustypes LIMIT 1`);
+        await pool.query(`SELECT 1
+                          FROM statustypes
+                          LIMIT 1`);
         this.logger.debug('Schema verification: statustypes table exists');
       } catch (verifyErr) {
         this.logger.error(`Schema verification failed: ${verifyErr.message}`);
         // Try to check what tables do exist
         const tables = await pool.query(`
-          SELECT tablename FROM pg_tables 
+          SELECT tablename
+          FROM pg_tables
           WHERE schemaname = 'public'
           ORDER BY tablename
         `);
-        this.logger.error(`Available tables: ${tables.rows.map(r => r.tablename).join(', ')}`);
+        this.logger.error(
+          `Available tables: ${tables.rows.map((r) => r.tablename).join(', ')}`,
+        );
         throw new Error('Schema not properly loaded before seeding');
       }
 
-      const seedPath = join(__dirname, '../../database/db/seed-project-data.sql');
+      const seedPath = join(
+        __dirname,
+        '../../database/db/seed-project-data.sql',
+      );
       const seedSql = readFileSync(seedPath, 'utf8');
-      
+
       const statements = this.parseSqlStatements(seedSql);
-      this.logger.log(`Executing ${statements.length} seed statements for ${dbName}`);
-      
+      this.logger.log(
+        `Executing ${statements.length} seed statements for ${dbName}`,
+      );
+
       for (let i = 0; i < statements.length; i++) {
         const stmt = statements[i];
-        
+
         try {
           const result = await pool.query(stmt);
         } catch (err) {
           const errMsg = err.message || '';
           if (!errMsg.includes('duplicate key')) {
-            this.logger.error(`Seed statement ${i + 1}/${statements.length} failed: ${errMsg}`);
-            this.logger.error(`Full statement (length ${stmt.length}): ${stmt}`);
+            this.logger.error(
+              `Seed statement ${i + 1}/${statements.length} failed: ${errMsg}`,
+            );
+            this.logger.error(
+              `Full statement (length ${stmt.length}): ${stmt}`,
+            );
             throw err;
           }
         }
@@ -338,7 +379,7 @@ export class DrizzleService implements OnModuleDestroy {
       const char = sql[i];
       const nextChar = sql[i + 1];
 
-      // Handle string literals  
+      // Handle string literals
       if ((char === '"' || char === "'") && sql[i - 1] !== '\\') {
         if (!inString) {
           inString = true;
