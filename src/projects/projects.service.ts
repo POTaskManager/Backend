@@ -222,13 +222,68 @@ export class ProjectsService {
     return result[0] || null;
   }
 
+  async getMembers(projectId: string) {
+    const members = await this.getDb()
+      .select({
+        userId: globalSchema.projectAccess.userId,
+        role: globalSchema.projectAccess.role,
+        userName: globalSchema.users.name,
+        userEmail: globalSchema.users.email,
+      })
+      .from(globalSchema.projectAccess)
+      .leftJoin(
+        globalSchema.users,
+        eq(globalSchema.projectAccess.userId, globalSchema.users.id),
+      )
+      .where(eq(globalSchema.projectAccess.projectId, projectId));
+
+    return members;
+  }
+
   async addMember(projectId: string, dto: AddMemberDto) {
+    // Resolve userId from email if email is provided
+    let userId = dto.userId;
+    
+    if (dto.email && !userId) {
+      const user = await this.getDb()
+        .select({ id: globalSchema.users.id })
+        .from(globalSchema.users)
+        .where(eq(globalSchema.users.email, dto.email));
+      
+      if (!user || user.length === 0) {
+        throw new NotFoundException(`User with email ${dto.email} not found`);
+      }
+      
+      userId = user[0].id;
+    }
+    
+    if (!userId) {
+      throw new Error('Either userId or email must be provided');
+    }
+    
+    // Resolve roleId from role name if role is provided
+    let roleId = dto.roleId;
+    const roleName = dto.role || 'member';
+    
+    if (!roleId) {
+      const roleResult = await this.getDb()
+        .select({ id: globalSchema.roles.id })
+        .from(globalSchema.roles)
+        .where(eq(globalSchema.roles.name, roleName));
+      
+      if (roleResult && roleResult.length > 0) {
+        roleId = roleResult[0].id;
+      }
+    }
+    
     const result = await this.getDb()
       .insert(globalSchema.projectAccess)
       .values({
         projectId,
-        userId: dto.userId,
-        role: 'member',
+        userId,
+        role: roleName,
+        roleId,
+        accepted: true,
       })
       .returning({
         id: globalSchema.projectAccess.id,

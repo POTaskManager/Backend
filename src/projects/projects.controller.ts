@@ -33,11 +33,9 @@ export class ProjectsController {
   }
 
   @Get()
-  findAll(@Query('userId') userId?: string) {
-    if (userId) {
-      return this.projectsService.findForUser(userId);
-    }
-    return this.projectsService.findAll();
+  findAll(@CurrentUser() user: User) {
+    // Always filter projects by current user - show only projects they belong to
+    return this.projectsService.findForUser(user.id);
   }
 
   @Get(':id')
@@ -56,6 +54,11 @@ export class ProjectsController {
   @Delete(':id')
   delete(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.projectsService.delete(id);
+  }
+
+  @Get(':id/members')
+  getMembers(@Param('id', new ParseUUIDPipe()) projectId: string) {
+    return this.projectsService.getMembers(projectId);
   }
 
   @Post(':id/members')

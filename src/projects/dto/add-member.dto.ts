@@ -1,9 +1,19 @@
-import { IsString, IsUUID } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class AddMemberDto {
+  @IsOptional()
   @IsUUID()
-  userId!: string;
+  userId?: string;
 
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsString()
-  roleId!: string;
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  roleId?: string;
 }
