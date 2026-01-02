@@ -52,8 +52,11 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  delete(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.projectsService.delete(id);
+  delete(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.projectsService.delete(id, user.id);
   }
 
   @Get(':id/members')
