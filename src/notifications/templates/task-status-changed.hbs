@@ -1,0 +1,26 @@
+<div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 15px 0; border-radius: 4px;">
+  <p style="margin: 0 0 10px 0; font-size: 16px;">
+    <strong>{{actorName}}</strong> changed task status in <span class="project-name">{{projectName}}</span>
+  </p>
+  <h2 style="margin: 10px 0; color: #333; font-size: 20px;">🔄 {{taskTitle}}</h2>
+</div>
+
+<div style="text-align: center; margin: 25px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+  <div style="display: inline-block; margin: 0 10px;">
+    <span style="background-color: #e0e0e0; color: #333; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+      {{oldStatus}}
+    </span>
+  </div>
+  <div style="display: inline-block; margin: 0 10px; font-size: 24px; color: #2196f3;">
+    →
+  </div>
+  <div style="display: inline-block; margin: 0 10px;">
+    <span style="background-color: #2196f3; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+      {{newStatus}}
+    </span>
+  </div>
+</div>
+
+<a href="{{taskUrl}}" class="button" style="background-color: #2196f3; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">
+  View Task
+</a>

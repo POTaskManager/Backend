@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DrizzleService } from '../drizzle/drizzle.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/events/notification-events';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { eq } from 'drizzle-orm';
@@ -8,13 +10,19 @@ import * as projectSchema from '../drizzle/schemas/project.schema';
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly drizzle: DrizzleService) {}
+  constructor(
+    private readonly drizzle: DrizzleService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async create(projectId: string, dto: CreateTaskDto, createdBy: string) {
     // Get project to find namespace
     const project = await this.drizzle
       .getGlobalDb()
-      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .select({ 
+        dbNamespace: globalSchema.projects.dbNamespace,
+        name: globalSchema.projects.name,
+      })
       .from(globalSchema.projects)
       .where(eq(globalSchema.projects.id, projectId));
 
@@ -54,7 +62,42 @@ export class TasksService {
         updatedAt: projectSchema.tasks.updatedAt,
       });
 
-    return result[0];
+    const task = result[0];
+
+    // Emit notifications
+    try {
+      // Get creator info
+      const creator = await this.drizzle.getGlobalDb()
+        .select({ name: globalSchema.users.name })
+        .from(globalSchema.users)
+        .where(eq(globalSchema.users.id, createdBy))
+        .limit(1);
+
+      // Emit task.assigned if assignee exists
+      if (task.assignedTo) {
+        const assignee = await this.drizzle.getGlobalDb()
+          .select({ name: globalSchema.users.name })
+          .from(globalSchema.users)
+          .where(eq(globalSchema.users.id, task.assignedTo))
+          .limit(1);
+
+        await this.notifications.emit(NotificationEvent.TASK_ASSIGNED, {
+          projectId,
+          projectName: project[0].name,
+          actorId: createdBy,
+          actorName: creator[0]?.name || 'Unknown User',
+          taskId: task.id,
+          taskTitle: task.title,
+          assigneeId: task.assignedTo,
+          assigneeName: assignee[0]?.name || 'Unknown User',
+        });
+      }
+    } catch (error) {
+      // Don't fail task creation if notification fails
+      console.error('Failed to send notification:', error);
+    }
+
+    return task;
   }
 
   async findAll(projectId: string) {
