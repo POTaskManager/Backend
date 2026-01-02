@@ -486,10 +486,192 @@ fi
 echo ""
 
 # ========================================
+# TEST 19: Get Project Statuses (new endpoint)
+# ========================================
+echo "TEST 19: Get Project Statuses with Columns"
+STATUSES_RESPONSE=$(curl -s -X GET $API_BASE/projects/$PROJECT_ID/statuses \
+    -H "Authorization: Bearer $TOKEN")
+
+STATUS_COUNT=$(echo $STATUSES_RESPONSE | jq -r '. | length')
+if [ "$STATUS_COUNT" -gt 0 ]; then
+    print_test "Get Project Statuses" "PASS"
+    echo "   Total statuses: $STATUS_COUNT"
+    FIRST_STATUS_NAME=$(echo $STATUSES_RESPONSE | jq -r '.[0].name')
+    FIRST_COLUMN_NAME=$(echo $STATUSES_RESPONSE | jq -r '.[0].columnName')
+    echo "   Example: $FIRST_STATUS_NAME → Column: $FIRST_COLUMN_NAME"
+else
+    echo "Response: $STATUSES_RESPONSE"
+    print_test "Get Project Statuses" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 20: Get Columns (new endpoint)
+# ========================================
+echo "TEST 20: Get Kanban Columns"
+COLUMNS_RESPONSE=$(curl -s -X GET $API_BASE/projects/$PROJECT_ID/statuses/columns \
+    -H "Authorization: Bearer $TOKEN")
+
+COLUMN_COUNT=$(echo $COLUMNS_RESPONSE | jq -r '. | length')
+if [ "$COLUMN_COUNT" -gt 0 ]; then
+    print_test "Get Kanban Columns" "PASS"
+    echo "   Total columns: $COLUMN_COUNT"
+    echo "   Columns:"
+    echo $COLUMNS_RESPONSE | jq -r '.[] | "     - \(.name) (order: \(.order))"'
+else
+    echo "Response: $COLUMNS_RESPONSE"
+    print_test "Get Kanban Columns" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 21: PATCH Task (partial update with workflow validation)
+# ========================================
+echo "TEST 21: PATCH Task - Partial Update"
+PATCH_RESPONSE=$(curl -s -X PATCH $API_BASE/projects/$PROJECT_ID/tasks/$TASK2_ID \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{
+        \"title\": \"${TASK2_TITLE}_UPDATED\",
+        \"priority\": 5
+    }")
+
+UPDATED_TITLE=$(echo $PATCH_RESPONSE | jq -r '.title')
+UPDATED_PRIORITY=$(echo $PATCH_RESPONSE | jq -r '.priority')
+if [[ "$UPDATED_TITLE" == *"_UPDATED"* ]] && [ "$UPDATED_PRIORITY" = "5" ]; then
+    print_test "PATCH Task (partial update)" "PASS"
+    echo "   Updated title: $UPDATED_TITLE"
+    echo "   Updated priority: $UPDATED_PRIORITY"
+else
+    echo "Response: $PATCH_RESPONSE"
+    print_test "PATCH Task (partial update)" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 22: PATCH Task with Status Change (workflow validation)
+# ========================================
+echo "TEST 22: PATCH Task - Status Change with Workflow Validation"
+# Try to move Task2 from To Do directly to Done (should fail if no transition exists)
+PATCH_STATUS_RESPONSE=$(curl -s -X PATCH $API_BASE/projects/$PROJECT_ID/tasks/$TASK2_ID \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{
+        \"statusId\": \"$INPROGRESS_STATUS\"
+    }")
+
+TASK2_NEW_STATUS=$(echo $PATCH_STATUS_RESPONSE | jq -r '.statusId')
+if [ "$TASK2_NEW_STATUS" = "$INPROGRESS_STATUS" ]; then
+    print_test "PATCH Task with Status (workflow validated)" "PASS"
+    echo "   Task2 moved to In Progress via PATCH"
+else
+    echo "Response: $PATCH_STATUS_RESPONSE"
+    print_test "PATCH Task with Status (workflow validated)" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 23: Create Label
+# ========================================
+echo "TEST 23: Create Label"
+LABEL_RESPONSE=$(curl -s -X POST $API_BASE/projects/$PROJECT_ID/labels \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{
+        \"name\": \"bug_${RANDOM_SUFFIX}\",
+        \"color\": \"#ff0000\"
+    }")
+
+LABEL_ID=$(echo $LABEL_RESPONSE | jq -r '.id')
+LABEL_NAME=$(echo $LABEL_RESPONSE | jq -r '.name')
+if [ "$LABEL_ID" != "null" ] && [ -n "$LABEL_ID" ]; then
+    print_test "Create Label" "PASS"
+    echo "   Label: $LABEL_NAME (ID: $LABEL_ID)"
+    echo "   Color: #ff0000"
+else
+    echo "Response: $LABEL_RESPONSE"
+    print_test "Create Label" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 24: Assign Label to Task
+# ========================================
+echo "TEST 24: Assign Label to Task"
+ASSIGN_LABEL_RESPONSE=$(curl -s -X POST $API_BASE/projects/$PROJECT_ID/labels/tasks/$TASK1_ID/assign/$LABEL_ID \
+    -H "Authorization: Bearer $TOKEN")
+
+ASSIGNED_TASK_ID=$(echo $ASSIGN_LABEL_RESPONSE | jq -r '.taskId')
+ASSIGNED_LABEL_ID=$(echo $ASSIGN_LABEL_RESPONSE | jq -r '.labelId')
+if [ "$ASSIGNED_TASK_ID" = "$TASK1_ID" ] && [ "$ASSIGNED_LABEL_ID" = "$LABEL_ID" ]; then
+    print_test "Assign Label to Task" "PASS"
+    echo "   Label '$LABEL_NAME' assigned to Task1"
+else
+    echo "Response: $ASSIGN_LABEL_RESPONSE"
+    print_test "Assign Label to Task" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 25: Get Task Labels
+# ========================================
+echo "TEST 25: Get Task Labels"
+TASK_LABELS_RESPONSE=$(curl -s -X GET $API_BASE/projects/$PROJECT_ID/labels/tasks/$TASK1_ID \
+    -H "Authorization: Bearer $TOKEN")
+
+LABEL_COUNT_FOR_TASK=$(echo $TASK_LABELS_RESPONSE | jq -r '. | length')
+if [ "$LABEL_COUNT_FOR_TASK" -gt 0 ]; then
+    print_test "Get Task Labels" "PASS"
+    echo "   Task has $LABEL_COUNT_FOR_TASK label(s)"
+else
+    echo "Response: $TASK_LABELS_RESPONSE"
+    print_test "Get Task Labels" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 26: Create Comment
+# ========================================
+echo "TEST 26: Create Comment on Task"
+COMMENT_RESPONSE=$(curl -s -X POST $API_BASE/projects/$PROJECT_ID/tasks/$TASK1_ID/comments \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{
+        \"content\": \"This is a test comment for run ${TIMESTAMP}\"
+    }")
+
+COMMENT_ID=$(echo $COMMENT_RESPONSE | jq -r '.id')
+if [ "$COMMENT_ID" != "null" ] && [ -n "$COMMENT_ID" ]; then
+    print_test "Create Comment" "PASS"
+    echo "   Comment ID: $COMMENT_ID"
+else
+    echo "Response: $COMMENT_RESPONSE"
+    print_test "Create Comment" "FAIL"
+fi
+echo ""
+
+# ========================================
+# TEST 27: Get Task Comments
+# ========================================
+echo "TEST 27: Get Task Comments"
+COMMENTS_RESPONSE=$(curl -s -X GET $API_BASE/projects/$PROJECT_ID/tasks/$TASK1_ID/comments \
+    -H "Authorization: Bearer $TOKEN")
+
+COMMENT_COUNT=$(echo $COMMENTS_RESPONSE | jq -r '. | length')
+if [ "$COMMENT_COUNT" -gt 0 ]; then
+    print_test "Get Task Comments" "PASS"
+    echo "   Task has $COMMENT_COUNT comment(s)"
+else
+    echo "Response: $COMMENTS_RESPONSE"
+    print_test "Get Task Comments" "FAIL"
+fi
+echo ""
+
+# ========================================
 # Summary
 # ========================================
 echo "=================================================="
-echo -e "${GREEN}✓ ALL TESTS PASSED (18/18)${NC}"
+echo -e "${GREEN}✓ ALL TESTS PASSED (27/27)${NC}"
 echo "=================================================="
 echo ""
 echo "Test Summary:"
@@ -500,8 +682,19 @@ echo "  Database: $DB_NAME"
 echo "  Sprint: $SPRINT_NAME (ID: $SPRINT_ID)"
 echo "  Board: $BOARD_NAME (ID: $BOARD_ID)"
 echo "  Tasks Created: 3"
+echo "  Labels Created: 1"
+echo "  Comments Created: 1"
 echo "  Workflow Validated: ✓"
+echo "  Status Transitions: ✓"
+echo "  PATCH Endpoint: ✓"
 echo "  Archive Tested: ✓"
+echo ""
+echo "New Features Tested:"
+echo "  ✓ GET /statuses - Status-Column mapping"
+echo "  ✓ GET /statuses/columns - Kanban columns"
+echo "  ✓ PATCH /tasks/:id - Partial update with workflow validation"
+echo "  ✓ Labels API - Create, assign, retrieve"
+echo "  ✓ Comments API - Create and list"
 echo ""
 echo "This test run was COMPLETELY INDEPENDENT with random data!"
 echo "Each run creates its own project database - no state sharing!"

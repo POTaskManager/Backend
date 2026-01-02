@@ -170,19 +170,67 @@ export class TasksService {
       );
     }
 
+    // Validate status transition if statusId is being changed
+    if (dto.statusId !== undefined && dto.statusId !== task[0].statusId) {
+      // Get new status
+      const newStatusArray = await projectClient
+        .select()
+        .from(projectSchema.statuses)
+        .where(eq(projectSchema.statuses.id, dto.statusId));
+
+      if (!newStatusArray || newStatusArray.length === 0) {
+        throw new NotFoundException(
+          `Status ${dto.statusId} not found`,
+        );
+      }
+
+      const newStatus = newStatusArray[0];
+
+      // Check if transition is allowed (only if current status exists)
+      let isTransitionAllowed = task[0].statusId === dto.statusId;
+      
+      if (!isTransitionAllowed && task[0].statusId) {
+        const allowedTransitions = await projectClient
+          .select()
+          .from(projectSchema.statusTransitions)
+          .where(
+            eq(projectSchema.statusTransitions.fromStatusId, task[0].statusId as string)
+          );
+
+        isTransitionAllowed = allowedTransitions.some((t) => t.toStatusId === dto.statusId);
+      } else if (!isTransitionAllowed) {
+        isTransitionAllowed = true; // Allow transition from null status
+      }
+
+      if (!isTransitionAllowed && task[0].statusId !== dto.statusId) {
+        // Get current status name for better error message
+        const currentStatusArray = await projectClient
+          .select()
+          .from(projectSchema.statuses)
+          .where(eq(projectSchema.statuses.id, task[0].statusId as string));
+
+        const currentStatusName = currentStatusArray[0]?.name || 'Unknown';
+        
+        throw new BadRequestException(
+          `Transition from '${currentStatusName}' to '${newStatus.name}' is not allowed`,
+        );
+      }
+    }
+
+    const updateData: any = {};
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.priority !== undefined) updateData.priority = dto.priority;
+    if (dto.dueAt !== undefined) updateData.dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
+    if (dto.assignedTo !== undefined) updateData.assignedTo = dto.assignedTo;
+    if (dto.statusId !== undefined) updateData.statusId = dto.statusId;
+    if (dto.sprintId !== undefined) updateData.sprintId = dto.sprintId;
+    if (dto.estimate !== undefined) updateData.estimate = dto.estimate;
+    updateData.updatedAt = new Date();
+
     const result = await projectClient
       .update(projectSchema.tasks)
-      .set({
-        title: dto.title,
-        description: dto.description,
-        priority: dto.priority,
-        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-        assignedTo: dto.assignedTo,
-        estimate: dto.estimate,
-        statusId: dto.statusId,
-        sprintId: dto.sprintId,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(projectSchema.tasks.id, id))
       .returning({
         id: projectSchema.tasks.id,

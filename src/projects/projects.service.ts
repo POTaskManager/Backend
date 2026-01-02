@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { DrizzleService } from '../drizzle/drizzle.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { eq, and, or, inArray } from 'drizzle-orm';
+import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import * as globalSchema from '../drizzle/schemas/global.schema';
 
 @Injectable()
@@ -213,13 +213,88 @@ export class ProjectsService {
     return result[0] || null;
   }
 
-  async delete(id: string) {
+  async delete(id: string, userId: string) {
+    // Step 1: Check if project exists and get namespace
+    const project = await this.getDb()
+      .select({
+        id: globalSchema.projects.id,
+        name: globalSchema.projects.name,
+        dbNamespace: globalSchema.projects.dbNamespace,
+      })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, id))
+      .limit(1);
+
+    if (!project[0]) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Step 2: Check user permissions (only owner or admin can delete)
+    const userAccess = await this.getDb()
+      .select({ role: globalSchema.projectAccess.role })
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, id),
+          eq(globalSchema.projectAccess.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!userAccess[0]) {
+      throw new ForbiddenException('You do not have access to this project');
+    }
+
+    const userRole = userAccess[0].role;
+    if (!userRole || !['owner', 'admin'].includes(userRole)) {
+      throw new ForbiddenException(
+        'Only project owner or admin can delete the project',
+      );
+    }
+
+    // Step 3: Drop project database
+    const dbName = `project_${project[0].dbNamespace}`;
+    try {
+      this.logger.log(`Attempting to drop database: ${dbName}`);
+      
+      // First, disconnect any active connections to the database
+      await this.drizzle.getGlobalDb().execute(sql`
+        SELECT pg_terminate_backend(pg_stat_activity.pid)
+        FROM pg_stat_activity
+        WHERE pg_stat_activity.datname = ${dbName}
+          AND pid <> pg_backend_pid()
+      `);
+
+      // Now drop the database
+      await this.drizzle.getGlobalDb().execute(sql`
+        DROP DATABASE IF EXISTS ${sql.identifier(dbName)}
+      `);
+      
+      this.logger.log(`Successfully dropped database: ${dbName}`);
+    } catch (error) {
+      this.logger.error(`Failed to drop database ${dbName}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to delete project database: ${error.message}`,
+      );
+    }
+
+    // Step 4: Delete project record from globaldb (CASCADE will delete projectaccess)
     const result = await this.getDb()
       .delete(globalSchema.projects)
       .where(eq(globalSchema.projects.id, id))
-      .returning({ id: globalSchema.projects.id });
-    
-    return result[0] || null;
+      .returning({
+        id: globalSchema.projects.id,
+        name: globalSchema.projects.name,
+      });
+
+    this.logger.log(
+      `Project deleted: ${result[0].name} (${result[0].id}) by user ${userId}`,
+    );
+
+    return {
+      message: 'Project deleted successfully',
+      project: result[0],
+    };
   }
 
   async getMembers(projectId: string) {

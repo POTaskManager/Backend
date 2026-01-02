@@ -6,9 +6,12 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BoardsModule } from './boards/boards.module';
 import { ChatModule } from './chat/chat.module';
+import { CommentsModule } from './comments/comments.module';
 import { DrizzleModule } from './drizzle/drizzle.module';
+import { LabelsModule } from './labels/labels.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SprintsModule } from './sprints/sprints.module';
+import { StatusesModule } from './statuses/statuses.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
 
@@ -31,7 +34,10 @@ import { UsersModule } from './users/users.module';
     BoardsModule,
     SprintsModule,
     TasksModule,
+    LabelsModule,
+    CommentsModule,
     ChatModule,
+    StatusesModule,
     AuthModule,
   ],
   controllers: [AppController],

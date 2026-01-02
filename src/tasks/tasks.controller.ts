@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Req,
@@ -72,5 +73,16 @@ export class TasksController {
   ) {
     const userId = request.user?.sub;
     return this.tasksService.changeStatus(projectId, id, dto.statusId, userId);
+  }
+
+  @Patch(':id')
+  partialUpdate(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateTaskDto,
+    @Req() request: any,
+  ) {
+    const userId = request.user?.sub;
+    return this.tasksService.update(projectId, id, dto, userId);
   }
 }
