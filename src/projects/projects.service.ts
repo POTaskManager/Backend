@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException, Logger, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { DrizzleService } from '../drizzle/drizzle.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import * as globalSchema from '../drizzle/schemas/global.schema';
+import { InvitationsService } from './invitations.service';
 
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
-  constructor(private readonly drizzle: DrizzleService) {}
+  constructor(
+    private readonly drizzle: DrizzleService,
+    private readonly invitationsService: InvitationsService,
+  ) {}
 
   private getDb() {
     return this.drizzle.getGlobalDb();
@@ -315,27 +319,12 @@ export class ProjectsService {
     return members;
   }
 
-  async addMember(projectId: string, dto: AddMemberDto) {
-    // Resolve userId from email if email is provided
-    let userId = dto.userId;
-    
-    if (dto.email && !userId) {
-      const user = await this.getDb()
-        .select({ id: globalSchema.users.id })
-        .from(globalSchema.users)
-        .where(eq(globalSchema.users.email, dto.email));
-      
-      if (!user || user.length === 0) {
-        throw new NotFoundException(`User with email ${dto.email} not found`);
-      }
-      
-      userId = user[0].id;
+  async addMember(projectId: string, dto: AddMemberDto, invitedBy: string) {
+    // Ensure email is provided
+    if (!dto.email) {
+      throw new Error('Email must be provided');
     }
-    
-    if (!userId) {
-      throw new Error('Either userId or email must be provided');
-    }
-    
+
     // Resolve roleId from role name if role is provided
     let roleId = dto.roleId;
     const roleName = dto.role || 'member';
@@ -350,24 +339,55 @@ export class ProjectsService {
         roleId = roleResult[0].id;
       }
     }
-    
-    const result = await this.getDb()
-      .insert(globalSchema.projectAccess)
-      .values({
-        projectId,
-        userId,
-        role: roleName,
-        roleId,
-        accepted: true,
-      })
-      .returning({
-        id: globalSchema.projectAccess.id,
-        projectId: globalSchema.projectAccess.projectId,
-        userId: globalSchema.projectAccess.userId,
-        role: globalSchema.projectAccess.role,
-      });
-    
-    return result[0] || null;
+
+    if (!roleId) {
+      throw new Error(`Role ${roleName} not found`);
+    }
+
+    // Check if user with this email exists
+    const [existingUser] = await this.getDb()
+      .select({ id: globalSchema.users.id })
+      .from(globalSchema.users)
+      .where(eq(globalSchema.users.email, dto.email))
+      .limit(1);
+
+    // Check if user is already a member (if they exist)
+    if (existingUser) {
+      const [existingMember] = await this.getDb()
+        .select()
+        .from(globalSchema.projectAccess)
+        .where(
+          and(
+            eq(globalSchema.projectAccess.projectId, projectId),
+            eq(globalSchema.projectAccess.userId, existingUser.id)
+          )
+        )
+        .limit(1);
+
+      if (existingMember) {
+        throw new BadRequestException('User is already a member of this project');
+      }
+    }
+
+    // Always create an invitation (whether user exists or not)
+    const invitation = await this.invitationsService.create(
+      projectId,
+      dto.email,
+      roleId,
+      invitedBy,
+    );
+
+    // TODO: Send invitation email here
+    // await this.mailService.sendInvitationEmail(invitation);
+
+    return {
+      invitationId: invitation.invitationId,
+      email: invitation.email,
+      status: invitation.status,
+      message: existingUser
+        ? 'Invitation sent. User must accept to join the project.'
+        : 'Invitation sent. User will need to register and accept the invitation.',
+    };
   }
 
   async removeMember(projectId: string, userId: string) {

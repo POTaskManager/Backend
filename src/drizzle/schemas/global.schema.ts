@@ -396,3 +396,50 @@ export const notificationLogsRelations = relations(
     }),
   })
 );
+
+// ============================================
+// INVITATIONS
+// ============================================
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: uuid('inv_invitationid').primaryKey().defaultRandom(),
+    projectId: uuid('inv_projectid')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    email: varchar('inv_email', { length: 255 }).notNull(),
+    roleId: uuid('inv_roleid').references(() => roles.id, {
+      onDelete: 'set null',
+    }),
+    invitedBy: uuid('inv_invited_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    token: varchar('inv_token', { length: 100 }).notNull().unique(),
+    status: varchar('inv_status', { length: 20 }).notNull().default('pending'),
+    createdAt: timestamp('inv_created_at').defaultNow(),
+    expiresAt: timestamp('inv_expires_at').defaultNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('idx_invitations_token').on(table.token),
+    projectStatusIdx: index('idx_invitations_project').on(
+      table.projectId,
+      table.status
+    ),
+    emailIdx: index('idx_invitations_email').on(table.email),
+  })
+);
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  project: one(projects, {
+    fields: [invitations.projectId],
+    references: [projects.id],
+  }),
+  role: one(roles, {
+    fields: [invitations.roleId],
+    references: [roles.id],
+  }),
+  invitedByUser: one(users, {
+    fields: [invitations.invitedBy],
+    references: [users.id],
+  }),
+}));
