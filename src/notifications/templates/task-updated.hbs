@@ -1,0 +1,24 @@
+<div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 15px 0; border-radius: 4px;">
+  <p style="margin: 0 0 10px 0; font-size: 16px;">
+    <strong>{{actorName}}</strong> updated a task in <span class="project-name">{{projectName}}</span>
+  </p>
+  <h2 style="margin: 10px 0; color: #333; font-size: 20px;">✏️ {{taskTitle}}</h2>
+</div>
+
+<div style="margin: 20px 0;">
+  <p style="font-size: 15px; color: #555; margin-bottom: 10px;">The following changes were made:</p>
+  <ul style="list-style: none; padding: 0; margin: 0;">
+    {{#each changes}}
+    <li style="background-color: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 4px; font-size: 14px;">
+      <strong>{{@key}}:</strong>
+      <span style="color: #d32f2f; text-decoration: line-through;">{{this.old}}</span>
+      →
+      <span style="color: #388e3c; font-weight: 500;">{{this.new}}</span>
+    </li>
+    {{/each}}
+  </ul>
+</div>
+
+<a href="{{taskUrl}}" class="button" style="background-color: #4caf50; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">
+  View Task
+</a>

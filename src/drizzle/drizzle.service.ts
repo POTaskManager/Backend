@@ -220,7 +220,7 @@ export class DrizzleService implements OnModuleDestroy {
       return pool;
     } catch (error) {
       await pool.end();
-      return pool;
+      throw error;
     }
   }
 
@@ -239,10 +239,11 @@ export class DrizzleService implements OnModuleDestroy {
       port: dbPort,
       user: dbUser,
       password: dbPassword,
+      database: 'postgres',
       // Admin connection - minimal pool
       max: 2,
       min: 0,
-      database: 'postgres',
+      idleTimeoutMillis: 10000,
     });
 
     try {
@@ -250,7 +251,7 @@ export class DrizzleService implements OnModuleDestroy {
       return pool;
     } catch (error) {
       await pool.end();
-      throw new Error(`Failed to create admin connection: ${error.message}`);
+      throw error;
     }
   }
 

@@ -310,3 +310,136 @@ export const projectAccessAuditRelations = relations(
     }),
   })
 );
+
+// ============================================
+// NOTIFICATION PREFERENCES
+// ============================================
+export const notificationPreferences = pgTable(
+  'notification_preferences',
+  {
+    id: uuid('np_id').primaryKey().defaultRandom(),
+    userId: uuid('np_userid')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emailEnabled: boolean('np_email_enabled').default(true),
+    pushEnabled: boolean('np_push_enabled').default(false),
+    events: jsonb('np_events').$type<Record<string, boolean>>().default({
+      'task.created': false,
+      'task.assigned': true,
+      'task.updated': true,
+      'task.status_changed': true,
+      'task.commented': true,
+      'task.deleted': true,
+      'sprint.created': false,
+      'sprint.started': true,
+      'sprint.completed': true,
+      'sprint.task_added': false,
+      'comment.created': true,
+      'comment.mentioned': true,
+      'chat.mentioned': true,
+    }),
+    createdAt: timestamp('np_created_at').defaultNow(),
+    updatedAt: timestamp('np_updated_at').defaultNow(),
+  },
+  (table) => ({
+    userIdxUnique: uniqueIndex('idx_notification_prefs_user').on(table.userId),
+  })
+);
+
+export const notificationPreferencesRelations = relations(
+  notificationPreferences,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [notificationPreferences.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+// ============================================
+// NOTIFICATION LOGS
+// ============================================
+export const notificationLogs = pgTable(
+  'notification_logs',
+  {
+    id: uuid('nl_id').primaryKey().defaultRandom(),
+    userId: uuid('nl_userid')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: varchar('nl_event_type', { length: 100 }).notNull(),
+    eventData: jsonb('nl_event_data').$type<Record<string, any>>(),
+    status: varchar('nl_status', { length: 20 }).notNull(), // 'pending' | 'sent' | 'failed' | 'skipped'
+    channel: varchar('nl_channel', { length: 20 }).notNull(), // 'email' | 'push'
+    errorMessage: text('nl_error_message'),
+    sentAt: timestamp('nl_sent_at'),
+    createdAt: timestamp('nl_created_at').defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('idx_notification_logs_user').on(
+      table.userId,
+      table.createdAt
+    ),
+    statusIdx: index('idx_notification_logs_status').on(
+      table.status,
+      table.createdAt
+    ),
+    eventIdx: index('idx_notification_logs_event').on(table.eventType),
+  })
+);
+
+export const notificationLogsRelations = relations(
+  notificationLogs,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [notificationLogs.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+// ============================================
+// INVITATIONS
+// ============================================
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: uuid('inv_invitationid').primaryKey().defaultRandom(),
+    projectId: uuid('inv_projectid')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    email: varchar('inv_email', { length: 255 }).notNull(),
+    roleId: uuid('inv_roleid').references(() => roles.id, {
+      onDelete: 'set null',
+    }),
+    invitedBy: uuid('inv_invited_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    token: varchar('inv_token', { length: 100 }).notNull().unique(),
+    status: varchar('inv_status', { length: 20 }).notNull().default('pending'),
+    createdAt: timestamp('inv_created_at').defaultNow(),
+    expiresAt: timestamp('inv_expires_at').defaultNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('idx_invitations_token').on(table.token),
+    projectStatusIdx: index('idx_invitations_project').on(
+      table.projectId,
+      table.status
+    ),
+    emailIdx: index('idx_invitations_email').on(table.email),
+  })
+);
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  project: one(projects, {
+    fields: [invitations.projectId],
+    references: [projects.id],
+  }),
+  role: one(roles, {
+    fields: [invitations.roleId],
+    references: [roles.id],
+  }),
+  invitedByUser: one(users, {
+    fields: [invitations.invitedBy],
+    references: [users.id],
+  }),
+}));

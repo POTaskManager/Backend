@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,6 +15,7 @@ import { SprintsModule } from './sprints/sprints.module';
 import { StatusesModule } from './statuses/statuses.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +28,24 @@ import { UsersModule } from './users/users.module';
         GOOGLE_CLIENT_SECRET: Joi.string().required(),
         GOOGLE_CALLBACK_URL: Joi.string().required(),
         GOOGLE_AUTH_REDIRECT: Joi.string().required(),
+        REDIS_HOST: Joi.string().default('redis'),
+        REDIS_PORT: Joi.number().default(6379),
+        SMTP_HOST: Joi.string().default('mailhog'),
+        SMTP_PORT: Joi.number().default(1025),
+        SMTP_SECURE: Joi.boolean().default(false),
+        SMTP_USER: Joi.string().allow('').optional(),
+        SMTP_PASSWORD: Joi.string().allow('').optional(),
+        SMTP_FROM: Joi.string().default('noreply@potask.local'),
+        FRONTEND_URL: Joi.string().default('http://localhost:3000'),
+      }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST', 'redis'),
+          port: config.get<number>('REDIS_PORT', 6379),
+        },
       }),
     }),
     DrizzleModule,
@@ -39,6 +59,7 @@ import { UsersModule } from './users/users.module';
     ChatModule,
     StatusesModule,
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

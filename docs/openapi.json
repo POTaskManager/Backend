@@ -1,0 +1,2385 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/api": {
+            "get": {
+                "operationId": "AppController_getHello",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "App"
+                ]
+            }
+        },
+        "/api/health": {
+            "get": {
+                "operationId": "AppController_healthCheck",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "App"
+                ]
+            }
+        },
+        "/api/users": {
+            "post": {
+                "operationId": "UsersController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUserDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User created successfully"
+                    },
+                    "400": {
+                        "description": "Invalid input or user already exists"
+                    }
+                },
+                "summary": "Register a new user",
+                "tags": [
+                    "users"
+                ]
+            },
+            "get": {
+                "operationId": "UsersController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Returns list of all users"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get all users",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
+        "/api/users/{id}": {
+            "get": {
+                "operationId": "UsersController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns user information"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get user by ID",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
+        "/api/projects": {
+            "post": {
+                "operationId": "ProjectsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateProjectDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Project created successfully with dedicated database"
+                    },
+                    "400": {
+                        "description": "Invalid input or namespace already exists"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Create a new project",
+                "tags": [
+                    "projects"
+                ]
+            },
+            "get": {
+                "operationId": "ProjectsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Returns list of projects the user is a member of"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get all projects for current user",
+                "tags": [
+                    "projects"
+                ]
+            }
+        },
+        "/api/projects/{id}": {
+            "get": {
+                "operationId": "ProjectsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns project details"
+                    },
+                    "404": {
+                        "description": "Project not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get project by ID",
+                "tags": [
+                    "projects"
+                ]
+            },
+            "put": {
+                "operationId": "ProjectsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateProjectDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Project updated successfully"
+                    },
+                    "403": {
+                        "description": "Insufficient permissions"
+                    },
+                    "404": {
+                        "description": "Project not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Update project",
+                "tags": [
+                    "projects"
+                ]
+            },
+            "delete": {
+                "operationId": "ProjectsController_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Project deleted successfully"
+                    },
+                    "403": {
+                        "description": "Only owner can delete project"
+                    },
+                    "404": {
+                        "description": "Project not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Delete project and its database",
+                "tags": [
+                    "projects"
+                ]
+            }
+        },
+        "/api/projects/{id}/members": {
+            "get": {
+                "operationId": "ProjectsController_getMembers",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns list of project members with roles"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get project members",
+                "tags": [
+                    "projects",
+                    "projects",
+                    "invitations"
+                ]
+            },
+            "post": {
+                "operationId": "ProjectsController_addMember",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddMemberDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Invitation sent successfully"
+                    },
+                    "400": {
+                        "description": "User already a member"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Invite user to project (creates invitation)",
+                "tags": [
+                    "projects",
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/{id}/members/{userId}": {
+            "delete": {
+                "operationId": "ProjectsController_removeMember",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "description": "User UUID to remove",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Member removed successfully"
+                    },
+                    "403": {
+                        "description": "Insufficient permissions"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Remove member from project",
+                "tags": [
+                    "projects",
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/{id}/invitations": {
+            "get": {
+                "operationId": "ProjectsController_listInvitations",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns list of pending invitations"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "List pending invitations for project",
+                "tags": [
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/{id}/invitations/{email}/resend": {
+            "post": {
+                "operationId": "ProjectsController_resendInvitation",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "email",
+                        "required": true,
+                        "in": "path",
+                        "description": "User email",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invitation resent with new token"
+                    },
+                    "404": {
+                        "description": "Invitation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Resend invitation email",
+                "tags": [
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/{id}/invitations/{email}": {
+            "delete": {
+                "operationId": "ProjectsController_cancelInvitation",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "email",
+                        "required": true,
+                        "in": "path",
+                        "description": "User email",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invitation cancelled"
+                    },
+                    "404": {
+                        "description": "Invitation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Cancel pending invitation",
+                "tags": [
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/invitations/accept/{token}": {
+            "post": {
+                "operationId": "ProjectsController_acceptInvitation",
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "path",
+                        "description": "Invitation token from email",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invitation accepted, user added to project"
+                    },
+                    "400": {
+                        "description": "Invalid or expired token"
+                    },
+                    "404": {
+                        "description": "Invitation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Accept project invitation",
+                "tags": [
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/invitations/my": {
+            "get": {
+                "operationId": "ProjectsController_getMyInvitations",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Returns pending invitations for current user with project and inviter details"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get my pending invitations (for dashboard)",
+                "tags": [
+                    "projects",
+                    "invitations"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/boards": {
+            "post": {
+                "operationId": "BoardsController_create",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateBoardDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Boards"
+                ]
+            },
+            "get": {
+                "operationId": "BoardsController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Boards"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/boards/workflow": {
+            "get": {
+                "operationId": "BoardsController_getWorkflow",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Boards"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/boards/{id}": {
+            "get": {
+                "operationId": "BoardsController_findOne",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Boards"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/boards/reorder": {
+            "post": {
+                "operationId": "BoardsController_reorder",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReorderColumnsDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Boards"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints": {
+            "post": {
+                "operationId": "SprintsController_create",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateSprintDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            },
+            "get": {
+                "operationId": "SprintsController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints/{id}": {
+            "get": {
+                "operationId": "SprintsController_findOne",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            },
+            "put": {
+                "operationId": "SprintsController_update",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateSprintDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints/{id}/start": {
+            "post": {
+                "operationId": "SprintsController_start",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints/{id}/complete": {
+            "post": {
+                "operationId": "SprintsController_complete",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints/{id}/statistics": {
+            "get": {
+                "operationId": "SprintsController_getStatistics",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/sprints/{id}/view": {
+            "get": {
+                "operationId": "SprintsController_getSprintView",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sprints"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/tasks": {
+            "post": {
+                "operationId": "TasksController_create",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateTaskDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            },
+            "get": {
+                "operationId": "TasksController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/tasks/{id}": {
+            "get": {
+                "operationId": "TasksController_findOne",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            },
+            "put": {
+                "operationId": "TasksController_update",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTaskDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            },
+            "delete": {
+                "operationId": "TasksController_delete",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            },
+            "patch": {
+                "operationId": "TasksController_partialUpdate",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTaskDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/tasks/{id}/status": {
+            "put": {
+                "operationId": "TasksController_changeStatus",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChangeStatusDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tasks"
+                ]
+            }
+        },
+        "/api/api/notifications/preferences": {
+            "get": {
+                "operationId": "NotificationsController_getPreferences",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            },
+            "put": {
+                "operationId": "NotificationsController_updatePreferences",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/labels": {
+            "post": {
+                "operationId": "LabelsController_create",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateLabelDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            },
+            "get": {
+                "operationId": "LabelsController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/labels/{id}": {
+            "get": {
+                "operationId": "LabelsController_findOne",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            },
+            "put": {
+                "operationId": "LabelsController_update",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateLabelDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            },
+            "delete": {
+                "operationId": "LabelsController_remove",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/labels/tasks/{taskId}/assign/{labelId}": {
+            "post": {
+                "operationId": "LabelsController_assignToTask",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "labelId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/labels/tasks/{taskId}/remove/{labelId}": {
+            "delete": {
+                "operationId": "LabelsController_removeFromTask",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "labelId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/labels/tasks/{taskId}": {
+            "get": {
+                "operationId": "LabelsController_getTaskLabels",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Labels"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/tasks/{taskId}/comments": {
+            "post": {
+                "operationId": "CommentsController_create",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateCommentDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Comments"
+                ]
+            },
+            "get": {
+                "operationId": "CommentsController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Comments"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/tasks/{taskId}/comments/{id}": {
+            "get": {
+                "operationId": "CommentsController_findOne",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Comments"
+                ]
+            },
+            "put": {
+                "operationId": "CommentsController_update",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateCommentDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Comments"
+                ]
+            },
+            "delete": {
+                "operationId": "CommentsController_remove",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "taskId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Comments"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats": {
+            "post": {
+                "operationId": "ChatController_createChat",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateChatDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            },
+            "get": {
+                "operationId": "ChatController_getUserChats",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats/{chatId}/messages": {
+            "get": {
+                "operationId": "ChatController_getChatHistory",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "chatId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "before",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats/messages": {
+            "post": {
+                "operationId": "ChatController_sendMessage",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendMessageDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats/messages/{messageId}": {
+            "put": {
+                "operationId": "ChatController_updateMessage",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "messageId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMessageDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            },
+            "delete": {
+                "operationId": "ChatController_deleteMessage",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "messageId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats/{chatId}/read/{messageId}": {
+            "post": {
+                "operationId": "ChatController_markAsRead",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "chatId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "messageId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/chats/upload": {
+            "post": {
+                "operationId": "ChatController_uploadFile",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chat"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/statuses": {
+            "get": {
+                "operationId": "StatusesController_findAll",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Statuses"
+                ]
+            }
+        },
+        "/api/projects/{projectId}/statuses/columns": {
+            "get": {
+                "operationId": "StatusesController_findColumns",
+                "parameters": [
+                    {
+                        "name": "projectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Statuses"
+                ]
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "operationId": "AuthController_login",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "user@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "StrongPassword123"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful, returns JWT tokens",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "accessToken": {
+                                            "type": "string"
+                                        },
+                                        "refreshToken": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    }
+                },
+                "summary": "Login with email and password",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "operationId": "AuthController_signOut",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Logout successful"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Logout current user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/auth/google/login": {
+            "get": {
+                "operationId": "AuthController_googleLogin",
+                "parameters": [],
+                "responses": {
+                    "302": {
+                        "description": "Redirects to Google OAuth consent screen"
+                    }
+                },
+                "summary": "Initiate Google OAuth login",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/auth/google/callback": {
+            "get": {
+                "operationId": "AuthController_googleCallback",
+                "parameters": [],
+                "responses": {
+                    "302": {
+                        "description": "Redirects to frontend with auth cookies"
+                    }
+                },
+                "summary": "Google OAuth callback",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "operationId": "AuthController_refreshToken",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed successfully"
+                    },
+                    "401": {
+                        "description": "Invalid refresh token"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Refresh access token using refresh token",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "operationId": "AuthController_getProfile",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Returns current user information",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "cookie": []
+                    }
+                ],
+                "summary": "Get current user profile",
+                "tags": [
+                    "auth"
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "TaskManager API",
+        "description": "Complete API documentation for TaskManager - Project Management System",
+        "version": "1.0",
+        "contact": {}
+    },
+    "tags": [
+        {
+            "name": "auth",
+            "description": "Authentication endpoints (login, logout, Google OAuth)"
+        },
+        {
+            "name": "users",
+            "description": "User management"
+        },
+        {
+            "name": "projects",
+            "description": "Project CRUD operations"
+        },
+        {
+            "name": "invitations",
+            "description": "Project invitations and membership"
+        },
+        {
+            "name": "boards",
+            "description": "Kanban boards management"
+        },
+        {
+            "name": "tasks",
+            "description": "Task CRUD and updates"
+        },
+        {
+            "name": "sprints",
+            "description": "Sprint management and statistics"
+        },
+        {
+            "name": "statuses",
+            "description": "Task statuses and columns"
+        },
+        {
+            "name": "labels",
+            "description": "Task labels and assignments"
+        },
+        {
+            "name": "comments",
+            "description": "Task comments"
+        },
+        {
+            "name": "chat",
+            "description": "Project chat and WebSocket"
+        },
+        {
+            "name": "notifications",
+            "description": "Notification system"
+        }
+    ],
+    "servers": [
+        {
+            "url": "http://localhost:4200",
+            "description": "Development server"
+        },
+        {
+            "url": "https://api.taskmanager.example.com",
+            "description": "Production server"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "JWT-auth": {
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "type": "http",
+                "name": "JWT",
+                "description": "Enter JWT token",
+                "in": "header"
+            },
+            "cookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "access_token"
+            }
+        },
+        "schemas": {
+            "CreateUserDto": {
+                "type": "object",
+                "properties": {
+                    "firstName": {
+                        "type": "string",
+                        "description": "User first name",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "example": "John"
+                    },
+                    "lastName": {
+                        "type": "string",
+                        "description": "User last name",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "example": "Doe"
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "User email address",
+                        "format": "email",
+                        "example": "john.doe@example.com"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "Strong password (min 8 characters)",
+                        "minLength": 8,
+                        "example": "StrongPassword123"
+                    },
+                    "preferredLocale": {
+                        "type": "string",
+                        "description": "Preferred locale/language",
+                        "example": "en-US"
+                    }
+                },
+                "required": [
+                    "firstName",
+                    "lastName",
+                    "email",
+                    "password"
+                ]
+            },
+            "CreateProjectDto": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Project name",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "example": "My Awesome Project"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Project description",
+                        "example": "A project for managing awesome tasks"
+                    },
+                    "memberEmails": {
+                        "description": "Array of user emails to invite",
+                        "example": [
+                            "user1@example.com",
+                            "user2@example.com"
+                        ],
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "UpdateProjectDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "AddMemberDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateBoardDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "ReorderColumnsDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateSprintDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateSprintDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateTaskDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateTaskDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "ChangeStatusDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateLabelDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateLabelDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateCommentDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateCommentDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateChatDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "SendMessageDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateMessageDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "User": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    }
+}
