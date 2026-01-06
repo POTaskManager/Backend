@@ -7,7 +7,8 @@ import { DrizzleService } from '../drizzle/drizzle.service';
 import { UsersService } from '../users/users.service';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
-import { eq, inArray, and, ne, isNull } from 'drizzle-orm';
+import { SprintQueryDto } from './dto/sprint-query.dto';
+import { eq, inArray, and, ne, isNull, gte, lte, asc, desc } from 'drizzle-orm';
 import * as globalSchema from '../drizzle/schemas/global.schema';
 import * as projectSchema from '../drizzle/schemas/project.schema';
 
@@ -71,7 +72,7 @@ export class SprintsService {
     return result[0];
   }
 
-  async findAll(projectId: string) {
+  async findAll(projectId: string, queryDto?: SprintQueryDto) {
     // Get project to find namespace
     const project = await this.drizzle
       .getGlobalDb()
@@ -87,16 +88,64 @@ export class SprintsService {
 
     const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
 
-    // Fetch sprints from project database
-    return projectClient
+    // Build query with filters
+    let query = projectClient
       .select({
         id: projectSchema.sprints.id,
         name: projectSchema.sprints.name,
         startDate: projectSchema.sprints.startDate,
         endDate: projectSchema.sprints.endDate,
         statusId: projectSchema.sprints.statusId,
+        status: {
+          id: projectSchema.statuses.id,
+          name: projectSchema.statuses.name,
+        },
       })
-      .from(projectSchema.sprints);
+      .from(projectSchema.sprints)
+      .leftJoin(
+        projectSchema.statuses,
+        eq(projectSchema.sprints.statusId, projectSchema.statuses.id)
+      );
+
+    // Apply filters if provided
+    const filters: any[] = [];
+
+    if (queryDto?.status) {
+      filters.push(eq(projectSchema.statuses.name, queryDto.status));
+    }
+
+    if (queryDto?.startDateFrom) {
+      filters.push(gte(projectSchema.sprints.startDate, new Date(queryDto.startDateFrom)));
+    }
+
+    if (queryDto?.startDateTo) {
+      filters.push(lte(projectSchema.sprints.startDate, new Date(queryDto.startDateTo)));
+    }
+
+    if (queryDto?.endDateFrom) {
+      filters.push(gte(projectSchema.sprints.endDate, new Date(queryDto.endDateFrom)));
+    }
+
+    if (queryDto?.endDateTo) {
+      filters.push(lte(projectSchema.sprints.endDate, new Date(queryDto.endDateTo)));
+    }
+
+    if (filters.length > 0) {
+      query = query.where(and(...filters)) as any;
+    }
+
+    // Apply sorting
+    if (queryDto?.sortBy) {
+      const sortField = 
+        queryDto.sortBy === 'startDate' ? projectSchema.sprints.startDate :
+        queryDto.sortBy === 'endDate' ? projectSchema.sprints.endDate :
+        projectSchema.sprints.name;
+
+      const sortFn = queryDto.sortOrder === 'desc' ? desc : asc;
+      query = query.orderBy(sortFn(sortField)) as any;
+    }
+
+    return query;
   }
 
   async findOne(projectId: string, id: string) {
@@ -551,5 +600,62 @@ export class SprintsService {
       },
       board,
     };
+  }
+
+  async remove(projectId: string, sprintId: string, userId: string) {
+    const project = await this.drizzle
+      .getGlobalDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
+
+    if (!project || !project[0]?.dbNamespace) {
+      throw new NotFoundException(
+        `Project ${projectId} not found or has no database`,
+      );
+    }
+
+    const projectClient = await this.drizzle.getProjectDb(project[0].dbNamespace);
+
+    // Check if sprint exists and get its status
+    const sprint = await projectClient
+      .select()
+      .from(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId))
+      .leftJoin(
+        projectSchema.statuses,
+        eq(projectSchema.sprints.statusId, projectSchema.statuses.id)
+      );
+
+    if (!sprint || sprint.length === 0) {
+      throw new NotFoundException(
+        `Sprint ${sprintId} not found in project ${projectId}`,
+      );
+    }
+
+    const sprintStatus = sprint[0].statuses?.name;
+
+    // Only allow deletion for Planning status
+    if (sprintStatus !== 'Planning') {
+      throw new BadRequestException(
+        `Cannot delete sprint with status "${sprintStatus}". Only sprints in "Planning" status can be deleted.`,
+      );
+    }
+
+    // Move tasks back to backlog (set sprintId to NULL)
+    await projectClient
+      .update(projectSchema.tasks)
+      .set({
+        sprintId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectSchema.tasks.sprintId, sprintId));
+
+    // Delete the sprint
+    await projectClient
+      .delete(projectSchema.sprints)
+      .where(eq(projectSchema.sprints.id, sprintId));
+
+    return { message: 'Sprint deleted successfully' };
   }
 }
