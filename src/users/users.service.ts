@@ -17,15 +17,21 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto) {
-    const passwordHash = await this.hashPassword(dto.password);
     const db = this.getDb();
+
+    // Build name from firstName and lastName, handling undefined/empty values
+    const nameParts = [dto.firstName, dto.lastName].filter(part => part && part.trim());
+    const fullName = nameParts.length > 0 ? nameParts.join(' ') : dto.email.split('@')[0];
+
+    // Hash password only if provided (OAuth users don't have password)
+    const passwordHash = dto.password ? await this.hashPassword(dto.password) : null;
 
     const user = await db
       .insert(globalSchema.users)
       .values({
         email: dto.email,
         passwordHash,
-        name: `${dto.firstName} ${dto.lastName}`,
+        name: fullName,
         isActive: true,
         emailVerified: false,
       })
@@ -159,6 +165,23 @@ export class UsersService {
           eq(globalSchema.sessions.revoked, false)
         )
       );
+  }
+
+  async setPassword(userId: string, newPassword: string) {
+    const db = this.getDb();
+    const passwordHash = await this.hashPassword(newPassword);
+
+    await db
+      .update(globalSchema.users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(globalSchema.users.id, userId));
+
+    return { success: true };
+  }
+
+  async hasPassword(userId: string): Promise<boolean> {
+    const user = await this.findOne(userId);
+    return !!(user && user.passwordHash);
   }
 
   private async hashPassword(raw: string) {

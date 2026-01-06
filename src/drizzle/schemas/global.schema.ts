@@ -33,7 +33,7 @@ export const users = pgTable(
   {
     id: uuid('user_userid').primaryKey().defaultRandom(),
     email: varchar('user_email', { length: 255 }).notNull().unique(),
-    passwordHash: varchar('user_password_hash', { length: 255 }).notNull(),
+    passwordHash: varchar('user_password_hash', { length: 255 }), // Nullable for OAuth-only users
     name: varchar('user_name', { length: 100 }),
     createdAt: timestamp('user_created_at').defaultNow(),
     emailVerified: boolean('user_email_verified').default(false),

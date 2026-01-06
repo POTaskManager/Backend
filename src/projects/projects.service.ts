@@ -85,24 +85,37 @@ export class ProjectsService {
 
       const project = newProject[0];
 
-      // Add owner as admin
+      // Add owner as admin with proper role_id
+      const [ownerRole] = await this.getDb()
+        .select({ id: globalSchema.roles.id })
+        .from(globalSchema.roles)
+        .where(eq(globalSchema.roles.name, 'owner'));
+
       await this.getDb()
         .insert(globalSchema.projectAccess)
         .values({
           projectId: project.id,
           userId: ownerId,
           role: 'owner',
+          roleId: ownerRole.id,
           accepted: true,
         });
 
       // Add initial members if provided
       if (memberIds.length > 0) {
+        // Get member role_id
+        const [memberRole] = await this.getDb()
+          .select({ id: globalSchema.roles.id })
+          .from(globalSchema.roles)
+          .where(eq(globalSchema.roles.name, 'member'));
+
         const memberData = memberIds
           .filter(id => id !== ownerId) // Don't duplicate owner
           .map(userId => ({
             projectId: project.id,
             userId,
             role: 'member',
+            roleId: memberRole.id,
             accepted: true,
           }));
 
@@ -135,23 +148,6 @@ export class ProjectsService {
   }
 
   async findForUser(userId: string) {
-    return this.getDb()
-      .select({
-        id: globalSchema.projects.id,
-        name: globalSchema.projects.name,
-        dbNamespace: globalSchema.projects.dbNamespace,
-        createdBy: globalSchema.projects.createdBy,
-        createdAt: globalSchema.projects.createdAt,
-      })
-      .from(globalSchema.projects)
-      .where(
-        or(
-          eq(globalSchema.projects.createdBy, userId),
-          // Check projectAccess relationship - joined subquery
-        )
-      );
-    
-    // Alternative: Direct query without join (simpler)
     // Get projects where user is owner
     const owned = await this.getDb()
       .select({
@@ -164,7 +160,7 @@ export class ProjectsService {
       .from(globalSchema.projects)
       .where(eq(globalSchema.projects.createdBy, userId));
 
-    // Get projects where user has access
+    // Get projects where user has access (member)
     const access = await this.getDb()
       .select({
         id: globalSchema.projects.id,
