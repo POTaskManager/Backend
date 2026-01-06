@@ -20,9 +20,9 @@ echo ""
 echo "Logging in..."
 LOGIN_RESPONSE=$(curl -s -X POST $API_BASE/auth/login \
     -H "Content-Type: application/json" \
-    -d '{"email": "jan.kowalski@example.com", "password": "Password123!"}')
+    -d '{"email": "test@test.com", "password": "Test123!"}')
 
-TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.access_token')
+TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.accessToken')
 
 if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
     echo -e "${RED}✗ Login failed!${NC}"
