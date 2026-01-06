@@ -230,7 +230,7 @@ export class InvitationsService {
     }));
   }
 
-  async listForUser(userEmail: string): Promise<Array<InvitationRecord & { projectName: string; inviterName: string }>> {
+  async listForUser(userEmail: string): Promise<Array<InvitationRecord & { projectName: string; inviterName: string; roleName?: string }>> {
     const db = this.getDb();
     
     const invitations = await db
@@ -239,6 +239,7 @@ export class InvitationsService {
         projectName: globalSchema.projects.name,
         inviterName: globalSchema.users.name,
         inviterEmail: globalSchema.users.email,
+        roleName: globalSchema.roles.name,
       })
       .from(globalSchema.invitations)
       .leftJoin(
@@ -248,6 +249,10 @@ export class InvitationsService {
       .leftJoin(
         globalSchema.users,
         eq(globalSchema.invitations.invitedBy, globalSchema.users.id)
+      )
+      .leftJoin(
+        globalSchema.roles,
+        eq(globalSchema.invitations.roleId, globalSchema.roles.id)
       )
       .where(
         and(
@@ -268,6 +273,7 @@ export class InvitationsService {
       expiresAt: row.invitation.expiresAt ?? new Date(),
       projectName: row.projectName ?? 'Unknown Project',
       inviterName: row.inviterName ?? row.inviterEmail ?? 'Unknown User',
+      roleName: row.roleName ?? undefined,
     }));
   }
 

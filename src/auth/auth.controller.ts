@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UseGuards, Body, HttpCode, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiCookieAuth, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -142,7 +142,38 @@ export class AuthController {
     type: User,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getProfile(@CurrentUser() user: User) {
-    return user;
+  async getProfile(@CurrentUser() user: User) {
+    const hasPassword = await this.authService.checkHasPassword(user.id);
+    return {
+      ...user,
+      hasPassword,
+    };
+  }
+
+  @Post('set-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'Set password for OAuth-only account' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: { type: 'string', format: 'password', example: 'NewStrongPassword123', minLength: 8 },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Password set successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async setPassword(
+    @CurrentUser() user: User,
+    @Body('password') password: string,
+  ) {
+    if (!password || password.length < 8) {
+      throw new UnauthorizedException('Password must be at least 8 characters long');
+    }
+    await this.authService.setPassword(user.id, password);
+    return { success: true, message: 'Password set successfully. You can now login with email and password.' };
   }
 }

@@ -19,6 +19,12 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
+    
+    // Check if user has a password set (OAuth users might not have one)
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses Google OAuth. Please login with Google or set a password first.');
+    }
+    
     const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
@@ -101,9 +107,23 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
+    
+    // Check if user has a password set (OAuth users might not have one)
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses Google OAuth. Please login with Google or set a password first.');
+    }
+    
     const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
     return { id: user.id, email: user.email };
+  }
+
+  async setPassword(userId: string, newPassword: string) {
+    return await this.userService.setPassword(userId, newPassword);
+  }
+
+  async checkHasPassword(userId: string): Promise<boolean> {
+    return await this.userService.hasPassword(userId);
   }
 }
