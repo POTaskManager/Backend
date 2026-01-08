@@ -15,6 +15,8 @@ import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway({
   cors: {
@@ -23,7 +25,6 @@ import { UpdateMessageDto } from './dto/update-message.dto';
   },
   namespace: '/chat',
 })
-@UseGuards(WsJwtGuard)
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
@@ -34,26 +35,73 @@ export class ChatGateway
   private readonly userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
   private readonly typingUsers = new Map<string, Set<string>>(); // chatId -> Set of userIds
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
   }
 
-  handleConnection(client: Socket) {
-    const userId = client.data.user?.userId;
-    if (!userId) {
+  async handleConnection(client: Socket) {
+    try {
+      // Extract and verify JWT token
+      const token = this.extractTokenFromHandshake(client);
+      
+      if (!token) {
+        this.logger.warn(`Connection rejected: No token provided for ${client.id}`);
+        client.disconnect();
+        return;
+      }
+
+      // Verify token and extract payload
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+
+      // Attach user info to socket
+      client.data.user = {
+        userId: payload.sub,
+        email: payload.email,
+      };
+
+      const userId = client.data.user.userId;
+
+      // Track user's socket
+      if (!this.userSockets.has(userId)) {
+        this.userSockets.set(userId, new Set());
+      }
+      this.userSockets.get(userId)!.add(client.id);
+
+      this.logger.log(`Client connected: ${client.id}, User: ${userId}`);
+    } catch (error) {
+      this.logger.error(`Connection rejected for ${client.id}: ${error.message}`);
       client.disconnect();
-      return;
+    }
+  }
+
+  private extractTokenFromHandshake(client: Socket): string | undefined {
+    // Extract token from cookies (primary method - matches REST API auth)
+    const cookies = client.handshake.headers.cookie;
+    if (cookies) {
+      const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
+      if (accessTokenMatch) {
+        return accessTokenMatch[1];
+      }
     }
 
-    // Track user's socket
-    if (!this.userSockets.has(userId)) {
-      this.userSockets.set(userId, new Set());
+    // Fallback: Try to get token from auth header (for non-browser clients)
+    const authHeader = client.handshake.headers.authorization;
+    if (authHeader) {
+      const [type, token] = authHeader.split(' ');
+      return type === 'Bearer' ? token : undefined;
     }
-    this.userSockets.get(userId)!.add(client.id);
 
-    this.logger.log(`Client connected: ${client.id}, User: ${userId}`);
+    // Fallback: Try to get token from query params or auth object
+    const token = client.handshake.auth?.token || client.handshake.query?.token;
+    return token as string | undefined;
   }
 
   handleDisconnect(client: Socket) {
@@ -82,6 +130,37 @@ export class ChatGateway
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('join_project')
+  async handleJoinProject(
+    @MessageBody() data: { projectId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const userId = client.data.user.userId;
+
+      // Verify user has access to this project
+      await this.chatService.verifyProjectAccess(data.projectId, userId);
+
+      // Join the project-level room to receive notifications for all chats
+      const projectRoom = `project:${data.projectId}`;
+      await client.join(projectRoom);
+      
+      this.logger.log(
+        `User ${userId} joined project room ${projectRoom}`,
+      );
+
+      client.emit('joined_project', {
+        projectId: data.projectId,
+        message: 'Successfully joined project room',
+      });
+    } catch (error) {
+      this.logger.error(`Error joining project: ${error.message}`);
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('join_chat')
   async handleJoinChat(
     @MessageBody() data: { projectId: string; chatId: string },
@@ -114,6 +193,32 @@ export class ChatGateway
     }
   }
 
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('leave_project')
+  async handleLeaveProject(
+    @MessageBody() data: { projectId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const userId = client.data.user.userId;
+
+      // Leave the project-level room
+      const projectRoom = `project:${data.projectId}`;
+      await client.leave(projectRoom);
+
+      this.logger.log(`User ${userId} left project room ${projectRoom}`);
+
+      client.emit('left_project', {
+        projectId: data.projectId,
+        message: 'Successfully left project room',
+      });
+    } catch (error) {
+      this.logger.error(`Error leaving project: ${error.message}`);
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('leave_chat')
   async handleLeaveChat(
     @MessageBody() data: { chatId: string },
@@ -147,6 +252,7 @@ export class ChatGateway
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @MessageBody()
@@ -170,6 +276,29 @@ export class ChatGateway
         chatId: data.sendMessageDto.chatId,
       });
 
+      // Also broadcast to project room for users not in this specific chat
+      // This allows them to see notifications/highlights
+      const projectRoom = `project:${data.projectId}`;
+      
+      // Get all sockets in the project room
+      const projectSockets = await this.server.in(projectRoom).fetchSockets();
+      // Get all sockets in the chat room
+      const chatSockets = await this.server.in(data.sendMessageDto.chatId).fetchSockets();
+      const chatSocketIds = new Set(chatSockets.map(s => s.id));
+      
+      // Send notification only to project room members NOT in the chat room
+      for (const socket of projectSockets) {
+        if (!chatSocketIds.has(socket.id)) {
+          socket.emit('chat_message_notification', {
+            type: 'chat_message_notification',
+            chatId: data.sendMessageDto.chatId,
+            projectId: data.projectId,
+            message,
+            senderId: userId,
+          });
+        }
+      }
+
       // Remove sender from typing indicator if they were typing
       const typingSet = this.typingUsers.get(data.sendMessageDto.chatId);
       if (typingSet && typingSet.has(userId)) {
@@ -189,6 +318,7 @@ export class ChatGateway
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('update_message')
   async handleUpdateMessage(
     @MessageBody()
@@ -224,6 +354,7 @@ export class ChatGateway
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('delete_message')
   async handleDeleteMessage(
     @MessageBody() data: { projectId: string; messageId: string; chatId: string },
@@ -249,6 +380,7 @@ export class ChatGateway
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('typing_start')
   async handleTypingStart(
     @MessageBody() data: { chatId: string; userName: string },
@@ -271,6 +403,7 @@ export class ChatGateway
     });
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('typing_stop')
   async handleTypingStop(
     @MessageBody() data: { chatId: string },
@@ -292,6 +425,7 @@ export class ChatGateway
     });
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('mark_as_read')
   async handleMarkAsRead(
     @MessageBody()
