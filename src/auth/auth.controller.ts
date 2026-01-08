@@ -1,5 +1,22 @@
-import { Controller, Get, Post, Req, Res, UseGuards, Body, HttpCode, UnauthorizedException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiCookieAuth, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  Body,
+  HttpCode,
+  UnauthorizedException,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiCookieAuth,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -29,12 +46,16 @@ export class AuthController {
       required: ['email', 'password'],
       properties: {
         email: { type: 'string', format: 'email', example: 'user@example.com' },
-        password: { type: 'string', format: 'password', example: 'StrongPassword123' },
+        password: {
+          type: 'string',
+          format: 'password',
+          example: 'StrongPassword123',
+        },
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Login successful, returns JWT tokens',
     schema: {
       type: 'object',
@@ -79,14 +100,20 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @Get('google/login')
   @ApiOperation({ summary: 'Initiate Google OAuth login' })
-  @ApiResponse({ status: 302, description: 'Redirects to Google OAuth consent screen' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirects to Google OAuth consent screen',
+  })
   googleLogin() {}
 
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
   @ApiOperation({ summary: 'Google OAuth callback' })
-  @ApiResponse({ status: 302, description: 'Redirects to frontend with auth cookies' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirects to frontend with auth cookies',
+  })
   async googleCallback(@CurrentUser() user: User, @Res() res: Response) {
     const response = await this.authService.login(user.id);
     const redirectUri = this.configService.getOrThrow<string>(
@@ -136,8 +163,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Returns current user information',
     type: User,
   })
@@ -160,7 +187,12 @@ export class AuthController {
       type: 'object',
       required: ['password'],
       properties: {
-        password: { type: 'string', format: 'password', example: 'NewStrongPassword123', minLength: 8 },
+        password: {
+          type: 'string',
+          format: 'password',
+          example: 'NewStrongPassword123',
+          minLength: 8,
+        },
       },
     },
   })
@@ -171,9 +203,42 @@ export class AuthController {
     @Body('password') password: string,
   ) {
     if (!password || password.length < 8) {
-      throw new UnauthorizedException('Password must be at least 8 characters long');
+      throw new UnauthorizedException(
+        'Password must be at least 8 characters long',
+      );
     }
     await this.authService.setPassword(user.id, password);
-    return { success: true, message: 'Password set successfully. You can now login with email and password.' };
+    return {
+      success: true,
+      message:
+        'Password set successfully. You can now login with email and password.',
+    };
+  }
+
+  @Get('ws-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'Get WebSocket token from existing session' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the access token for WebSocket connection',
+    schema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - no valid session' })
+  getWebSocketToken(@Req() req): { token: string } {
+    // Extract the access_token from cookies
+    const cookies = req.cookies;
+    const token = cookies?.access_token;
+
+    if (!token) {
+      throw new UnauthorizedException('No access token found in cookies');
+    }
+
+    return { token };
   }
 }

@@ -23,7 +23,7 @@ export class ChatService {
     private readonly projects: ProjectsService,
   ) {}
 
-  private async verifyProjectAccess(
+  public async verifyProjectAccess(
     projectId: string,
     userId: string,
   ) {
