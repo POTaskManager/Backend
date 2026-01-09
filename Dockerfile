@@ -18,6 +18,10 @@ COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 # Build application
 RUN npm run build
 
+# Include email templates in the build output
+RUN mkdir -p dist/notifications/templates \
+  && cp -R src/notifications/templates/* dist/notifications/templates/
+
 # Stage 2: Production
 FROM node:20-alpine
 
