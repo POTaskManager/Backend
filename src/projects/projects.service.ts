@@ -540,7 +540,7 @@ export class ProjectsService {
         and(
           eq(globalSchema.projectAccess.projectId, projectId),
           eq(globalSchema.projectAccess.userId, userId),
-          eq(globalSchema.projectAccess.status, 'accepted'),
+          eq(globalSchema.projectAccess.accepted, true),
         )
       );
 

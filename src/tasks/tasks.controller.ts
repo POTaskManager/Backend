@@ -9,6 +9,8 @@ import {
   Post,
   Put,
   Req,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiCookieAuth } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -17,12 +19,17 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { TasksService } from './tasks.service';
+import { LabelsService } from '../labels/labels.service';
 
 @ApiTags('tasks')
 @ApiCookieAuth()
 @Controller('projects/:projectId/tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    @Inject(forwardRef(() => LabelsService))
+    private readonly labelsService: LabelsService,
+  ) {}
 
   @Post()
   @ApiOperation({ 
@@ -140,6 +147,22 @@ export class TasksController {
   ) {
     const userId = request.user?.sub;
     return this.tasksService.update(projectId, id, dto, userId);
+  }
+
+  @Get(':id/labels')
+  @ApiOperation({ 
+    summary: 'Get task labels',
+    description: 'Retrieves all labels assigned to a specific task. This is an alias for /api/projects/:projectId/labels/tasks/:taskId for better REST semantics.'
+  })
+  @ApiParam({ name: 'projectId', description: 'Project UUID' })
+  @ApiParam({ name: 'id', description: 'Task UUID' })
+  @ApiResponse({ status: 200, description: 'Returns list of task labels' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  getTaskLabels(
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('id', new ParseUUIDPipe()) taskId: string,
+  ) {
+    return this.labelsService.getTaskLabels(projectId, taskId);
   }
 }
 
