@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
 
@@ -16,9 +16,41 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
+  async register(createUserDto: CreateUserDto) {
+    // Check if user already exists
+    const existingUser = await this.userService.findByEmail(createUserDto.email);
+    if (existingUser) {
+      throw new BadRequestException('User with this email already exists');
+    }
+
+    // Create new user
+    const newUser = await this.userService.create(createUserDto);
+
+    // Generate tokens and create session
+    const { accessToken, refreshToken } = await this.generateTokens(newUser.id);
+    const hashedRefreshToken = await hash(refreshToken, 10);
+    await this.userService.createOrUpdateSession(newUser.id, hashedRefreshToken);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+      },
+    };
+  }
+
   async validateUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
+    
+    // Check if user has a password set (OAuth users might not have one)
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses Google OAuth. Please login with Google or set a password first.');
+    }
+    
     const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
@@ -101,9 +133,27 @@ export class AuthService {
   async validateLocalUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found!');
+    
+    // Check if user has a password set (OAuth users might not have one)
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses Google OAuth. Please login with Google or set a password first.');
+    }
+    
     const isPasswordMatch = await compare(password, user.passwordHash);
     if (!isPasswordMatch)
       throw new UnauthorizedException('Invalid credentials');
     return { id: user.id, email: user.email };
+  }
+
+  async setPassword(userId: string, newPassword: string) {
+    return await this.userService.setPassword(userId, newPassword);
+  }
+
+  async checkHasPassword(userId: string): Promise<boolean> {
+    return await this.userService.hasPassword(userId);
+  }
+
+  async getUserStatistics(userId: string) {
+    return await this.userService.getUserStatistics(userId);
   }
 }

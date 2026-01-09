@@ -53,7 +53,8 @@ export class NotificationsProcessor extends WorkerHost {
   private initializeTransporter() {
     const host = this.config.get<string>('SMTP_HOST', 'mailhog');
     const port = this.config.get<number>('SMTP_PORT', 1025);
-    const secure = this.config.get<boolean>('SMTP_SECURE', false);
+    const secureRaw = this.config.get('SMTP_SECURE', 'false');
+    const secure = secureRaw === true || secureRaw === 'true' || secureRaw === '1';
     const user = this.config.get<string>('SMTP_USER');
     const pass = this.config.get<string>('SMTP_PASSWORD');
 
@@ -61,6 +62,7 @@ export class NotificationsProcessor extends WorkerHost {
       host,
       port,
       secure,
+      requireTLS: !secure && port === 587,
       auth:
         user && pass
           ? {
