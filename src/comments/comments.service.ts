@@ -7,7 +7,7 @@ import {
 import { DrizzleService } from '../drizzle/drizzle.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import * as globalSchema from '../drizzle/schemas/global.schema';
 import * as projectSchema from '../drizzle/schemas/project.schema';
 
@@ -89,6 +89,7 @@ export class CommentsService {
     }
 
     const projectDb = await this.drizzle.getProjectDb(project[0].dbNamespace);
+    const globalDb = this.drizzle.getGlobalDb();
 
     // Get comments ordered by creation date (newest first)
     const comments = await projectDb
@@ -104,7 +105,35 @@ export class CommentsService {
       .where(eq(projectSchema.comments.taskId, taskId))
       .orderBy(desc(projectSchema.comments.createdAt));
 
-    return comments;
+    // Fetch user names from global database
+    const userIds = [...new Set(comments.map(c => c.userId).filter(id => id !== null))] as string[];
+    
+    if (userIds.length === 0) {
+      return comments.map(comment => ({
+        ...comment,
+        userName: 'Unknown User',
+      }));
+    }
+
+    const users = await globalDb
+      .select({
+        id: globalSchema.users.id,
+        name: globalSchema.users.name,
+      })
+      .from(globalSchema.users)
+      .where(inArray(globalSchema.users.id, userIds));
+
+    // Create user map
+    const usersMap = new Map<string, string>();
+    for (const user of users) {
+      usersMap.set(user.id, user.name || 'Unknown User');
+    }
+
+    // Add userName to each comment
+    return comments.map(comment => ({
+      ...comment,
+      userName: comment.userId ? (usersMap.get(comment.userId) || 'Unknown User') : 'Unknown User',
+    }));
   }
 
   /**

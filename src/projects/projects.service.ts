@@ -3,8 +3,9 @@ import { DrizzleService } from '../drizzle/drizzle.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { eq, and, or, inArray, sql } from 'drizzle-orm';
+import { eq, and, or, inArray, sql, isNull } from 'drizzle-orm';
 import * as globalSchema from '../drizzle/schemas/global.schema';
+import * as projectSchema from '../drizzle/schemas/project.schema';
 import { InvitationsService } from './invitations.service';
 
 @Injectable()
@@ -182,7 +183,24 @@ export class ProjectsService {
     return uniqueProjects;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId: string) {
+    // Step 1: Check if user has access to this project
+    const userAccess = await this.getDb()
+      .select({ id: globalSchema.projectAccess.id })
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, id),
+          eq(globalSchema.projectAccess.userId, userId)
+        )
+      )
+      .limit(1);
+    
+    if (!userAccess || userAccess.length === 0) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    // Step 2: Return project details
     const result = await this.getDb()
       .select({
         id: globalSchema.projects.id,
@@ -197,7 +215,29 @@ export class ProjectsService {
     return result[0] || null;
   }
 
-  async update(id: string, dto: UpdateProjectDto) {
+  async update(id: string, dto: UpdateProjectDto, userId: string) {
+    // Step 1: Check if user is owner or admin
+    const userAccess = await this.getDb()
+      .select({ role: globalSchema.projectAccess.role })
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, id),
+          eq(globalSchema.projectAccess.userId, userId)
+        )
+      )
+      .limit(1);
+    
+    if (!userAccess || userAccess.length === 0) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    const userRole = userAccess[0].role;
+    if (!userRole || !['owner', 'admin'].includes(userRole)) {
+      throw new ForbiddenException('Only project owner or admin can update the project');
+    }
+
+    // Step 2: Update project
     const result = await this.getDb()
       .update(globalSchema.projects)
       .set({ name: dto.name })
@@ -297,7 +337,24 @@ export class ProjectsService {
     };
   }
 
-  async getMembers(projectId: string) {
+  async getMembers(projectId: string, userId: string) {
+    // Step 1: Verify user is a member of this project
+    const userAccess = await this.getDb()
+      .select({ id: globalSchema.projectAccess.id })
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, userId)
+        )
+      )
+      .limit(1);
+    
+    if (!userAccess || userAccess.length === 0) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    // Step 2: Return all project members
     const members = await this.getDb()
       .select({
         userId: globalSchema.projectAccess.userId,
@@ -386,14 +443,36 @@ export class ProjectsService {
     };
   }
 
-  async removeMember(projectId: string, userId: string) {
+  async removeMember(projectId: string, userIdToRemove: string, requestingUserId: string) {
+    // Step 1: Check if requesting user is owner or admin
+    const requestingUserAccess = await this.getDb()
+      .select({ role: globalSchema.projectAccess.role })
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, requestingUserId)
+        )
+      )
+      .limit(1);
+    
+    if (!requestingUserAccess || requestingUserAccess.length === 0) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    const requestingUserRole = requestingUserAccess[0].role;
+    if (!requestingUserRole || !['owner', 'admin'].includes(requestingUserRole)) {
+      throw new ForbiddenException('Only project owner or admin can remove members');
+    }
+
+    // Step 2: Find member to remove
     const existing = await this.getDb()
       .select({ id: globalSchema.projectAccess.id })
       .from(globalSchema.projectAccess)
       .where(
         and(
           eq(globalSchema.projectAccess.projectId, projectId),
-          eq(globalSchema.projectAccess.userId, userId)
+          eq(globalSchema.projectAccess.userId, userIdToRemove)
         )
       );
     
@@ -401,6 +480,7 @@ export class ProjectsService {
       throw new NotFoundException('Member not found in project');
     }
     
+    // Step 3: Remove member
     const result = await this.getDb()
       .delete(globalSchema.projectAccess)
       .where(eq(globalSchema.projectAccess.id, existing[0].id))
@@ -408,4 +488,381 @@ export class ProjectsService {
     
     return result[0] || null;
   }
+
+  async getActivities(projectId: string, userId: string) {
+    // Step 1: Check if project exists
+    const project = await this.getDb()
+      .select({ id: globalSchema.projects.id, createdBy: globalSchema.projects.createdBy })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId))
+      .limit(1);
+
+    if (!project[0]) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Step 2: Verify user is the owner
+    if (project[0].createdBy !== userId) {
+      throw new ForbiddenException('Only project owner can view activity history');
+    }
+
+    // Step 3: Get audit logs for this project
+    const activities = await this.getDb()
+      .select({
+        id: globalSchema.projectAccessAudit.id,
+        operation: globalSchema.projectAccessAudit.operation,
+        changedAt: globalSchema.projectAccessAudit.changedAt,
+        changedBy: globalSchema.projectAccessAudit.changedBy,
+        userId: globalSchema.projectAccessAudit.userId,
+        changedFields: globalSchema.projectAccessAudit.changedFields,
+        old: globalSchema.projectAccessAudit.old,
+        new: globalSchema.projectAccessAudit.new,
+        userName: globalSchema.users.name,
+        userEmail: globalSchema.users.email,
+      })
+      .from(globalSchema.projectAccessAudit)
+      .leftJoin(
+        globalSchema.users,
+        eq(globalSchema.projectAccessAudit.userId, globalSchema.users.id)
+      )
+      .where(eq(globalSchema.projectAccessAudit.projectId, projectId))
+      .orderBy(sql`${globalSchema.projectAccessAudit.changedAt} DESC`);
+
+    return activities;
+  }
+
+  async getBacklog(projectId: string, userId: string) {
+    // Verify membership
+    const isMember = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, userId),
+          eq(globalSchema.projectAccess.accepted, true),
+        )
+      );
+
+    if (isMember.length === 0) {
+      throw new ForbiddenException('Not a member of this project');
+    }
+
+    // Get project namespace
+    const project = await this.getDb()
+      .select({ namespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
+
+    if (project.length === 0) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const namespace = project[0].namespace;
+    const projectDb = await this.drizzle.getProjectDb(namespace);
+
+    // Get tasks without sprint assignment
+    const backlogTasks = await projectDb
+      .select()
+      .from(projectSchema.tasks)
+      .where(isNull(projectSchema.tasks.sprintId))
+      .orderBy(projectSchema.tasks.priority, projectSchema.tasks.createdAt);
+
+    return backlogTasks;
+  }
+
+  async searchProject(projectId: string, query: string, type?: string, userId?: string) {
+    // Verify membership if userId provided
+    if (userId) {
+      const isMember = await this.getDb()
+        .select()
+        .from(globalSchema.projectAccess)
+        .where(
+          and(
+            eq(globalSchema.projectAccess.projectId, projectId),
+            eq(globalSchema.projectAccess.userId, userId),
+            eq(globalSchema.projectAccess.accepted, true),
+          )
+        );
+
+      if (isMember.length === 0) {
+        throw new ForbiddenException('Not a member of this project');
+      }
+    }
+
+    // Get project namespace
+    const project = await this.getDb()
+      .select({ namespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
+
+    if (project.length === 0) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const namespace = project[0].namespace;
+    const projectDb = await this.drizzle.getProjectDb(namespace);
+
+    const results: Array<{
+      type: string;
+      id: string;
+      title: string;
+      snippet: string;
+      createdAt: Date | null;
+    }> = [];
+    const searchPattern = `%${query}%`;
+
+    // Search tasks
+    if (!type || type === 'task') {
+      const tasks = await projectDb
+        .select()
+        .from(projectSchema.tasks)
+        .where(
+          or(
+            sql`${projectSchema.tasks.title} ILIKE ${searchPattern}`,
+            sql`${projectSchema.tasks.description} ILIKE ${searchPattern}`
+          )
+        )
+        .limit(50);
+
+      results.push(...tasks.map(task => ({
+        type: 'task',
+        id: task.id,
+        title: task.title,
+        snippet: task.description?.substring(0, 200) || '',
+        createdAt: task.createdAt,
+      })));
+    }
+
+    // Search comments
+    if (!type || type === 'comment') {
+      const comments = await projectDb
+        .select()
+        .from(projectSchema.comments)
+        .where(sql`${projectSchema.comments.content} ILIKE ${searchPattern}`)
+        .limit(50);
+
+      results.push(...comments.map(comment => ({
+        type: 'comment',
+        id: comment.id,
+        title: `Comment on task`,
+        snippet: comment.content.substring(0, 200),
+        createdAt: comment.createdAt,
+      })));
+    }
+
+    // Search chat messages
+    if (!type || type === 'chat') {
+      const messages = await projectDb
+        .select()
+        .from(projectSchema.chatMessages)
+        .where(sql`${projectSchema.chatMessages.message} ILIKE ${searchPattern}`)
+        .limit(50);
+
+      results.push(...messages.map(msg => ({
+        type: 'chat',
+        id: msg.id,
+        title: `Chat message`,
+        snippet: msg.message.substring(0, 200),
+        createdAt: msg.createdAt,
+      })));
+    }
+
+    return {
+      results: results.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)),
+      total: results.length,
+    };
+  }
+
+  async updateMemberRole(projectId: string, targetUserId: string, role: string, requestingUserId: string) {
+    // Verify requesting user is owner or admin
+    const requestingMember = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, requestingUserId),
+          eq(globalSchema.projectAccess.accepted, true),
+        )
+      );
+
+    if (requestingMember.length === 0 || !requestingMember[0].role || !['owner', 'admin'].includes(requestingMember[0].role)) {
+      throw new ForbiddenException('Only owner or admin can change member roles');
+    }
+
+    // Validate role
+    if (!['owner', 'admin', 'member', 'viewer'].includes(role)) {
+      throw new BadRequestException('Invalid role. Must be: owner, admin, member, or viewer');
+    }
+
+    // Get target member
+    const targetMember = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, targetUserId),
+          eq(globalSchema.projectAccess.accepted, true),
+        )
+      );
+
+    if (targetMember.length === 0) {
+      throw new NotFoundException('User is not a member of this project');
+    }
+
+    // Prevent changing owner role
+    if (targetMember[0].role === 'owner') {
+      throw new ForbiddenException('Cannot change owner role');
+    }
+
+    const oldRole = targetMember[0].role;
+
+    // Update role
+    await this.getDb()
+      .update(globalSchema.projectAccess)
+      .set({ role, updatedAt: new Date() })
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, targetUserId),
+        )
+      );
+
+    // Record in audit log
+    await this.getDb().insert(globalSchema.projectAccessAudit).values({
+      projectId,
+      userId: targetUserId,
+      operation: 'role_changed',
+      changedBy: requestingUserId,
+      changedAt: new Date(),
+      changedFields: ['role'],
+      old: { role: oldRole },
+      new: { role },
+    });
+
+    // Return updated member
+    const updatedMember = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, targetUserId),
+        )
+      );
+
+    return updatedMember[0];
+  }
+
+  async getProjectStatistics(projectId: string, userId: string) {
+    // Verify membership
+    const isMember = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.userId, userId),
+          eq(globalSchema.projectAccess.accepted, true),
+        )
+      );
+
+    if (isMember.length === 0) {
+      throw new ForbiddenException('Not a member of this project');
+    }
+
+    // Get project namespace
+    const project = await this.getDb()
+      .select({ dbNamespace: globalSchema.projects.dbNamespace })
+      .from(globalSchema.projects)
+      .where(eq(globalSchema.projects.id, projectId));
+
+    if (project.length === 0) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const namespace = project[0].dbNamespace;
+    const projectDb = await this.drizzle.getProjectDb(namespace);
+
+    // Get all tasks with status info
+    const allTasksWithStatus = await projectDb
+      .select({
+        task: projectSchema.tasks,
+        statusType: projectSchema.statuses.typeId,
+      })
+      .from(projectSchema.tasks)
+      .leftJoin(
+        projectSchema.statuses,
+        eq(projectSchema.tasks.statusId, projectSchema.statuses.id)
+      );
+    
+    // Get all sprints with status info
+    const allSprintsWithStatus = await projectDb
+      .select({
+        sprint: projectSchema.sprints,
+        statusName: projectSchema.statuses.name,
+      })
+      .from(projectSchema.sprints)
+      .leftJoin(
+        projectSchema.statuses,
+        eq(projectSchema.sprints.statusId, projectSchema.statuses.id)
+      );
+
+    // Get all members
+    const allMembers = await this.getDb()
+      .select()
+      .from(globalSchema.projectAccess)
+      .where(
+        and(
+          eq(globalSchema.projectAccess.projectId, projectId),
+          eq(globalSchema.projectAccess.accepted, true),
+        )
+      );
+
+    // Calculate task statistics
+    const taskStats = {
+      total: allTasksWithStatus.length,
+      completed: allTasksWithStatus.filter(t => t.statusType === 3).length, // 3 = done
+      inProgress: allTasksWithStatus.filter(t => t.statusType === 2).length, // 2 = in_progress
+      todo: allTasksWithStatus.filter(t => t.statusType === 1).length, // 1 = todo
+      backlog: allTasksWithStatus.filter(t => !t.task.sprintId).length,
+    };
+
+    // Calculate sprint statistics
+    const completedSprints = allSprintsWithStatus.filter(s => s.statusName === 'Completed');
+    const totalVelocity = completedSprints.reduce((sum, sprint) => {
+      const sprintTasks = allTasksWithStatus.filter(t => t.task.sprintId === sprint.sprint.id);
+      const completedInSprint = sprintTasks.filter(t => t.statusType === 3).length;
+      return sum + completedInSprint;
+    }, 0);
+
+    const sprintStats = {
+      total: allSprintsWithStatus.length,
+      active: allSprintsWithStatus.filter(s => s.statusName === 'Active').length,
+      completed: completedSprints.length,
+      averageVelocity: completedSprints.length > 0 ? Math.round(totalVelocity / completedSprints.length) : 0,
+    };
+
+    // Calculate team statistics
+    const roleCounts = allMembers.reduce((acc, member) => {
+      const role = member.role || 'member';
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const teamStats = {
+      totalMembers: allMembers.length,
+      activeMembers: allMembers.length, // Could be refined with activity checks
+      roles: roleCounts,
+    };
+
+    return {
+      tasks: taskStats,
+      sprints: sprintStats,
+      team: teamStats,
+    };
+  }
 }
+

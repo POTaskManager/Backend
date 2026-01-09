@@ -26,6 +26,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { RefreshAuthGuard } from './guards/refresh-jwt.guard';
 import { ConfigService } from '@nestjs/config';
+import { UsersService } from '../users/users.service';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 import type { Response } from 'express';
 
 @ApiTags('auth')
@@ -34,7 +36,52 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly usersService: UsersService,
   ) {}
+
+  @Public()
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new user and auto-login' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'User created successfully and logged in, returns JWT tokens',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        email: { type: 'string' },
+        accessToken: { type: 'string' },
+        refreshToken: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input or user already exists' })
+  async register(
+    @Body() dto: CreateUserDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const user = await this.usersService.create(dto);
+    const tokens = await this.authService.login(user.id);
+    
+    response.cookie('access_token', tokens.accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 15 * 60 * 1000,
+    });
+    response.cookie('refresh_token', tokens.refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
+    
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
 
   @Public()
   @Post('login')
@@ -177,44 +224,6 @@ export class AuthController {
     };
   }
 
-  @Post('set-password')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(200)
-  @ApiCookieAuth()
-  @ApiOperation({ summary: 'Set password for OAuth-only account' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['password'],
-      properties: {
-        password: {
-          type: 'string',
-          format: 'password',
-          example: 'NewStrongPassword123',
-          minLength: 8,
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Password set successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async setPassword(
-    @CurrentUser() user: User,
-    @Body('password') password: string,
-  ) {
-    if (!password || password.length < 8) {
-      throw new UnauthorizedException(
-        'Password must be at least 8 characters long',
-      );
-    }
-    await this.authService.setPassword(user.id, password);
-    return {
-      success: true,
-      message:
-        'Password set successfully. You can now login with email and password.',
-    };
-  }
-
   @Get('ws-token')
   @UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
@@ -240,5 +249,81 @@ export class AuthController {
     }
 
     return { token };
+  }
+
+  @Post('set-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  @ApiCookieAuth()
+  @ApiOperation({ 
+    summary: 'Set password for OAuth-only account',
+    description: 'Allows users who registered via Google OAuth to set a password for email/password login. This enables them to login without Google if needed. Password must be at least 8 characters. After setting password, user can use both Google OAuth and email/password authentication methods. Useful for account recovery if OAuth provider access is lost.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: { type: 'string', format: 'password', example: 'NewStrongPassword123', minLength: 8 },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Password set successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async setPassword(
+    @CurrentUser() user: User,
+    @Body('password') password: string,
+  ) {
+    if (!password || password.length < 8) {
+      throw new UnauthorizedException('Password must be at least 8 characters long');
+    }
+    await this.authService.setPassword(user.id, password);
+    return { success: true, message: 'Password set successfully. You can now login with email and password.' };
+  }
+
+  @Get('me/statistics')
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ 
+    summary: 'Get current user statistics',
+    description: 'Retrieves comprehensive statistics for the authenticated user including total tasks assigned, completed tasks, active projects, contribution metrics, and recent activity summary. Essential for personal dashboards and productivity tracking. Updates in real-time as user performs actions.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns user statistics and activity metrics',
+    schema: {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'object',
+          properties: {
+            assigned: { type: 'number', description: 'Total tasks currently assigned' },
+            completed: { type: 'number', description: 'Total tasks completed' },
+            inProgress: { type: 'number', description: 'Tasks currently in progress' },
+            overdue: { type: 'number', description: 'Overdue tasks' },
+          },
+        },
+        projects: {
+          type: 'object',
+          properties: {
+            total: { type: 'number', description: 'Total projects user is member of' },
+            owned: { type: 'number', description: 'Projects where user is owner' },
+            active: { type: 'number', description: 'Projects with recent activity' },
+          },
+        },
+        activity: {
+          type: 'object',
+          properties: {
+            commentsPosted: { type: 'number', description: 'Total comments posted' },
+            tasksCreated: { type: 'number', description: 'Total tasks created' },
+            chatMessages: { type: 'number', description: 'Total chat messages sent' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getUserStatistics(@CurrentUser() user: User) {
+    return this.authService.getUserStatistics(user.id);
   }
 }

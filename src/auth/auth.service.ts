@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
 
@@ -15,6 +15,32 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
+
+  async register(createUserDto: CreateUserDto) {
+    // Check if user already exists
+    const existingUser = await this.userService.findByEmail(createUserDto.email);
+    if (existingUser) {
+      throw new BadRequestException('User with this email already exists');
+    }
+
+    // Create new user
+    const newUser = await this.userService.create(createUserDto);
+
+    // Generate tokens and create session
+    const { accessToken, refreshToken } = await this.generateTokens(newUser.id);
+    const hashedRefreshToken = await hash(refreshToken, 10);
+    await this.userService.createOrUpdateSession(newUser.id, hashedRefreshToken);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+      },
+    };
+  }
 
   async validateUser(email: string, password: string) {
     const user = await this.userService.findByEmail(email);
@@ -125,5 +151,9 @@ export class AuthService {
 
   async checkHasPassword(userId: string): Promise<boolean> {
     return await this.userService.hasPassword(userId);
+  }
+
+  async getUserStatistics(userId: string) {
+    return await this.userService.getUserStatistics(userId);
   }
 }

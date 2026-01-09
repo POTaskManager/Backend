@@ -27,28 +27,13 @@ export class ChatService {
     projectId: string,
     userId: string,
   ) {
-    // Get project
-    const project = await this.projects.findOne(projectId);
+    // Get project - now requires userId for access control
+    const project = await this.projects.findOne(projectId, userId);
     if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
+      throw new NotFoundException(`Project with ID ${projectId} not found or access denied`);
     }
 
-    // Verify user has access to project
-    const access = await this.drizzle
-      .getGlobalDb()
-      .select()
-      .from(globalSchema.projectAccess)
-      .where(
-        and(
-          eq(globalSchema.projectAccess.projectId, projectId),
-          eq(globalSchema.projectAccess.userId, userId)
-        )
-      );
-
-    if (!access || access.length === 0) {
-      throw new ForbiddenException('You do not have access to this project');
-    }
-
+    // User access is already verified in findOne()
     return project;
   }
 
