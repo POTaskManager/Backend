@@ -12,6 +12,9 @@ async function bootstrap() {
   // Initialize Drizzle database service
   const drizzleService = app.get(DrizzleService);
   await drizzleService.initializeGlobalDb();
+
+  
+  const apiUrl = process.env.API_URL ? process.env.API_URL : "http://localhost:4200"
   
   // Configure CORS based on environment
   const corsOrigin = process.env.CORS_ORIGIN
@@ -64,7 +67,7 @@ async function bootstrap() {
     .addTag('comments', 'Task comments')
     .addTag('chat', 'Project chat and WebSocket')
     .addTag('notifications', 'Notification system')
-    .addServer('http://localhost:4200', 'Development server')
+    .addServer(`${apiUrl}`, 'Development server')
     .addServer('https://api.taskmanager.example.com', 'Production server')
     .build();
 
